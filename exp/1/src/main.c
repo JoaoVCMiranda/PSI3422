@@ -40,11 +40,11 @@ void run(void)
     {
         if (sensor.distance <= DISTANCIA_MINIMA)
         {
-            motor_right(&carrinho);
+            d(&carrinho);
         }
         else
         {
-            motor_forward(&carrinho);
+            w(&carrinho);
         }
 
         k_msleep(10);

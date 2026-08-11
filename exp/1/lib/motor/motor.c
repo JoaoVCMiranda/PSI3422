@@ -23,22 +23,10 @@ static void motor_set(motor_t *motor, uint8_t d1, uint8_t d2, uint8_t d3, uint8_
     gpio_pin_set(motor->gpio, motor->d4, d4);
 }
 
-void motor_forward(motor_t *motor)
-{
-    motor_set(motor, 1, 0, 1, 0);
-}
+void w(motor_t *motor){ motor_set(motor, 1, 0, 1, 0); }
 
-void motor_left(motor_t *motor)
-{
-    motor_set(motor, 0, 0, 1, 0);
-}
+void a(motor_t *motor){ motor_set(motor, 0, 0, 1, 0); }
 
-void motor_right(motor_t *motor)
-{
-    motor_set(motor, 1, 0, 0, 0);
-}
+void d(motor_t *motor){ motor_set(motor, 1, 0, 0, 0); }
 
-void motor_stop(motor_t *motor)
-{
-    motor_set(motor, 1, 1, 1, 1);
-}
+void s(motor_t *motor){ motor_set(motor, 1, 1, 1, 1); }
