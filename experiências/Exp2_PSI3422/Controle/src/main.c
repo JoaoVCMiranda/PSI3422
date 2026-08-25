@@ -204,7 +204,7 @@ void main()
 
 
     printk("\n=== PSI3422 Exp2_PSI3422 -- controle ===\n");
-    printk("Joystick ativado (PTB0=X, PTB1=Y, PTB2=Botao de Freio)\n");
+    printk("Joystick desabilitado (hardware com defeito, ver nota em joystick_read())\n");
     printk("UART fallback: w/a/s/d = mover, x/espaco = frear, q = ponto morto, o = modo automatico\n\n");
 
     radio_cmd_t cmd = { .auto_mode = 1 }; /* começa em modo seguro */
@@ -220,7 +220,18 @@ void main()
             int16_t mr = 0;
             bool brk = false;
 
-            joystick_read(&ml, &mr, &brk);
+            /*
+             * Desabilitado de novo: validado em debug/JoystickCheck
+             * (branch debug/exp2-validacoes) que o eixo continua
+             * travado perto de 3,3V/4095 nesta bancada — com
+             * joystick_read() ativo, ml fica quase sempre != 0 e o
+             * joystick "assume prioridade" (linha abaixo) em toda
+             * volta do loop sem tecla de UART, girando o carrinho
+             * sozinho. Reative só depois de confirmar com multímetro
+             * que o wiper varia suave 0..3,3V no potenciômetro (ver
+             * debug/README.md).
+             */
+            // joystick_read(&ml, &mr, &brk);
 
             if (brk || ml != 0 || mr != 0) {
                 // Joystick takes priority if it's being used
