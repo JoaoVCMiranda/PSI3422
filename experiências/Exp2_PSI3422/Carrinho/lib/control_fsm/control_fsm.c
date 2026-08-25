@@ -2,6 +2,10 @@
 
 #include <zephyr.h>
 
+/* velocidade usada nas 3 manobras de auto_mode (frente/curva/ré) —
+ * mesma magnitude nos dois motores, só muda sinal/qual roda. */
+#define VELOCIDADE_AUTO (INT16_MAX / 2)
+
 static int64_t last_heartbeat_ms;
 
 void control_fsm_heartbeat()
@@ -25,12 +29,22 @@ void control_fsm_apply(const radio_cmd_t *cmd,
     if (cmd->auto_mode) {
         float distance = ultrassom_read(sensor);
 
-        if (distance <= DISTANCIA_MINIMA_M) {
+        if (distance <= DISTANCIA_PARADA_M) {
+            /* obstáculo colado — para completamente, sem tentar manobra */
             motor_freia(motor_l);
             motor_freia(motor_r);
+        } else if (distance <= DISTANCIA_CURVA_M) {
+            /* perto demais pra virar com segurança — dá ré */
+            motor_set(motor_l, -VELOCIDADE_AUTO);
+            motor_set(motor_r, -VELOCIDADE_AUTO);
+        } else if (distance <= DISTANCIA_FRENTE_M) {
+            /* obstáculo à frente — vira à direita (pivô: L frente, R ré) */
+            motor_set(motor_l, VELOCIDADE_AUTO);
+            motor_set(motor_r, -VELOCIDADE_AUTO);
         } else {
-            motor_set(motor_l, INT16_MAX / 2);
-            motor_set(motor_r, INT16_MAX / 2);
+            /* livre — segue em frente */
+            motor_set(motor_l, VELOCIDADE_AUTO);
+            motor_set(motor_r, VELOCIDADE_AUTO);
         }
         return;
     }
