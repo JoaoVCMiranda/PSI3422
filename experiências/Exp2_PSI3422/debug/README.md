@@ -1,25 +1,26 @@
 # debug/ — validações de bancada, fora da entrega
 
-Dois firmwares Zephyr isolados pra validar hardware sem depender do
-resto do Exp2_PSI3422 (rádio, control_fsm, etc.) — se algo não bate
-aqui, o problema é de fiação/mecânica, não de lógica de controle.
-Vivem na branch `debug/exp2-validacoes`, não em `main`.
+Firmwares Zephyr isolados pra validar hardware sem depender do resto
+do Exp2_PSI3422 (rádio, control_fsm, etc.) — se algo não bate aqui, o
+problema é de fiação/mecânica, não de lógica de controle. Vivem na
+branch `debug/exp2-validacoes`, não em `main`.
 
 Serial monitor: **115200 8N1**, não 9600 — `current-speed` no
-`zephyr.dts` gerado pelo build (Carrinho, Controle e os dois
+`zephyr.dts` gerado pelo build (Carrinho, Controle e os três
 firmwares daqui) é sempre `0x1c200` = 115200; `pio device monitor`
 sem `--baud` já cai nesse default do board.
 
 ## monitor.py
 
 Painel serial (`uv run monitor.py [porta] [--control]`) que lê a
-saída de qualquer um dos 4 firmwares (Carrinho, Controle,
-JoystickCheck, AlinhamentoCheck), separa os tipos de log em métricas
-ao vivo (telemetria, comando, joystick bruto, fase do
-AlinhamentoCheck, erros/avisos) e, com `--control`, repassa
-w/a/s/d/x/espaço/q/o pra UART do Controle — mesmo protocolo de
+saída de qualquer um dos firmwares (Carrinho, Controle, JoystickCheck,
+AlinhamentoCheck), separa os tipos de log em métricas ao vivo
+(telemetria, comando, joystick bruto, fase do AlinhamentoCheck,
+erros/avisos) e, com `--control`, repassa w/a/s/d/x/espaço/q/o pra
+UART do Controle — mesmo protocolo de
 `../Controle/script/controle_serial.py`. Ver docstring do script pra
-detalhes.
+detalhes. As linhas `SWEEP ...` do DutySweepCheck ainda não têm painel
+dedicado, caem no log bruto.
 
 ## JoystickCheck
 
