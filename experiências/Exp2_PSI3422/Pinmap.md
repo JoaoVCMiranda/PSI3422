@@ -21,6 +21,10 @@ Nem SPI nem TPM têm nó de devicetree neste port (Zephyr 2.7.1 empacotado pelo 
 | Rádio — CE | PTA13 | GPIO |
 | Rádio — IRQ | PTD2 | GPIO entrada, interrupção ativa em LOW |
 | LED status (vermelho/verde) | PTB18 / PTB19 | Active low |
+| Encoder IR HW-201 — esquerda (reservado) | PTD1 | GPIO entrada, interrupção — ver `debug/EncoderCheck` |
+| Encoder IR HW-201 — direita (reservado) | PTD3 | GPIO entrada, interrupção — ver `debug/EncoderCheck` |
+
+Encoders: ainda não instalados fisicamente (Aula 4). Reservados em PORTD de propósito — nesta subfamília KL25Z só PORTA e PORTC/PORTD têm vetor de interrupção de pino; PORTB/PORTE não geram IRQ por mudança de pino (confirmado na bancada: `gpioe` como IRQ deu problema). PTD1/PTD3 ficam nos "buracos" entre os pinos de PORTD já usados (TRIG=PTD0, IRQ do rádio=PTD2, ECHO=PTD4, motor R IN2=PTD5), mesmo port já comprovado como fonte de interrupção.
 
 ## Controle
 

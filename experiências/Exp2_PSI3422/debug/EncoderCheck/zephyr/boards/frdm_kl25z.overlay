@@ -1,0 +1,12 @@
+/*
+ * gpioc vem com status="disabled" por padrão neste board
+ * (dts/arm/nxp/nxp_kl25z.dtsi) — só gpioa/b/d são habilitados pelo
+ * frdm_kl25z.dts. Motor L (IN1/IN2) usa PTC8/PTC9, então precisa
+ * ligar aqui (mesmo motivo do overlay em ../../Carrinho e
+ * ../AlinhamentoCheck/../DutySweepCheck). Não precisa de gpioe: os
+ * encoders vão em PTD1/PTD3 (gpiod, já default) — ver aviso no topo
+ * de src/main.c sobre por que não PORTB/PORTE.
+ */
+&gpioc {
+	status = "okay";
+};

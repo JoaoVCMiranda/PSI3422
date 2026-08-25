@@ -43,3 +43,32 @@ Como os dois motores recebem literalmente o mesmo valor, qualquer
 desvio observado aqui é mecânico (roda torta, folga, atrito
 desigual) — não dá pra atribuir a uma diferença de código entre os
 dois lados.
+
+## DutySweepCheck
+
+Flasha no board do **Carrinho**. Testado depois do `AlinhamentoCheck`
+mostrar o carrinho andando torto: sobe o duty de CADA motor sozinho
+(o outro freado) em degraus de 0 até o máximo, ~1,5s por degrau, e
+imprime o duty a cada passo. Levante o carrinho do chão e anote o
+duty onde cada roda sai do lugar (torque de arranque) — se os dois
+valores forem bem diferentes, é evidência objetiva de motor/ponte
+H/fiação desigual, não só impressão visual.
+
+Conferido antes de suspeitar de hardware: `pwm_z42.c`/`motor.c`
+escrevem `CnV`/`CnSC` pelo mesmo código pros dois canais TPM, só
+endereçando índices diferentes — duty comandado é garantidamente
+idêntico em registrador nos dois motores.
+
+## EncoderCheck
+
+Flasha no board do **Carrinho**. Mesmo duty fixo nos dois motores
+(igual `AlinhamentoCheck`), mas agora conta pulsos dos dois encoders
+IR HW-201 (um por roda) e imprime pulsos/segundo (PPS) de cada lado a
+cada 1s — dá um número real de rotação em vez de só observação
+visual. Levante o carrinho do chão antes de ligar.
+
+Encoders ainda não instalados fisicamente — pinos reservados em
+PTD1 (esquerda) / PTD3 (direita), ver `../Pinmap.md`. De propósito
+NÃO em PORTB/PORTE: nesta subfamília KL25Z só PORTA e PORTC/PORTD têm
+vetor de interrupção de pino — foi exatamente o problema relatado ao
+tentar usar `gpioe` como IRQ antes.
