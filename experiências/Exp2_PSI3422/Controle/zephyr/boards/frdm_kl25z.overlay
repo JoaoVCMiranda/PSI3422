@@ -1,0 +1,23 @@
+/*
+ * gpioc e gpioe vêm com status="disabled" por padrão neste board
+ * (dts/arm/nxp/nxp_kl25z.dtsi) — só gpioa/b/d são habilitados pelo
+ * frdm_kl25z.dts. O controle usa PTC (CSN/SCK/MOSI/MISO do rádio) e
+ * PTE (IRQ do rádio), então precisam ser ligados aqui.
+ *
+ * Este arquivo é auto-descoberto pelo boilerplate.cmake do Zephyr
+ * porque está em zephyr/boards/ (dentro do APPLICATION_SOURCE_DIR
+ * usado pelo CMake, que é zephyr/, não a raiz do projeto PlatformIO)
+ * — não precisa de nenhuma opção em platformio.ini. Ver
+ * troubleshooting/collect2-error-ld-returned-1-exit-status.md.
+ *
+ * SPI não aparece aqui porque não tem nó de devicetree neste port
+ * (ver comentário no topo de src/main.c) — spi.c acessa os
+ * registradores direto via CMSIS, sem passar pela devicetree.
+ */
+&gpioc {
+	status = "okay";
+};
+
+&gpioe {
+	status = "okay";
+};
