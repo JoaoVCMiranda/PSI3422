@@ -17,9 +17,9 @@
 #include <drivers/uart.h>
 #include <drivers/adc.h>
 #include <sys/printk.h>
-#include <string.h>
 
 #include "nrf24.h"
+#include "../../protocol.h"
 
 /* ── Pinmap — mesmo rádio do carrinho, ver ../Pinmap.md ── */
 #define RADIO_CE_PORT  DEVICE_DT_GET(DT_NODELABEL(gpioa))
@@ -85,31 +85,6 @@ static struct adc_sequence joystick_seq = {
 #define VELOCIDADE_PADRAO 16000
 #define VELOCIDADE_GIRO   12000
 
-typedef struct {
-    bool auto_mode;
-    bool freio;
-    int16_t motor_l;
-    int16_t motor_r;
-} control_cmd_t;
-
-static void pack_cmd(uint8_t *payload, const control_cmd_t *cmd)
-{
-    memset(payload, 0, NRF24_MAX_PAYLOAD_SIZE);
-    payload[0] = cmd->auto_mode ? 1 : 0;
-    payload[1] = cmd->freio ? 1 : 0;
-    payload[2] = (uint8_t)(cmd->motor_l & 0xFF);
-    payload[3] = (uint8_t)(cmd->motor_l >> 8);
-    payload[4] = (uint8_t)(cmd->motor_r & 0xFF);
-    payload[5] = (uint8_t)(cmd->motor_r >> 8);
-}
-
-static void unpack_telemetry(const uint8_t *payload, uint16_t *dist_cm, int16_t *duty_l, int16_t *duty_r)
-{
-    *dist_cm = (uint16_t)(payload[0] | (payload[1] << 8));
-    *duty_l = (int16_t)(payload[2] | (payload[3] << 8));
-    *duty_r = (int16_t)(payload[4] | (payload[5] << 8));
-}
-
 static int16_t clamp_motor(int32_t v)
 {
     if (v > INT16_MAX) return INT16_MAX;
@@ -154,7 +129,7 @@ static void joystick_read(int16_t *ml, int16_t *mr, bool *brk)
 /*
  * Traduz uma tecla em um novo estado de comando (mantido para compatibilidade com UART)
  */
-static bool key_to_cmd(uint8_t key, control_cmd_t *cmd)
+static bool key_to_cmd(uint8_t key, radio_cmd_t *cmd)
 {
     switch (key) {
     case 'w': case 'W':
@@ -232,7 +207,7 @@ void main()
     printk("Joystick ativado (PTB0=X, PTB1=Y, PTB2=Botao de Freio)\n");
     printk("UART fallback: w/a/s/d = mover, x/espaco = frear, q = ponto morto, o = modo automatico\n\n");
 
-    control_cmd_t cmd = { .auto_mode = true }; /* começa em modo seguro */
+    radio_cmd_t cmd = { .auto_mode = 1 }; /* começa em modo seguro */
 
     for (;;) {
         uint8_t key;
@@ -266,23 +241,22 @@ void main()
             }
         }
 
-        uint8_t tx_payload[NRF24_MAX_PAYLOAD_SIZE];
-        pack_cmd(tx_payload, &cmd);
+        /* payload fixo de 32 bytes nos dois lados (ver nota em Carrinho/src/main.c);
+         * radio_cmd_t/radio_telemetry_t (protocol.h) só cobrem o início dele. */
+        uint8_t tx_payload[NRF24_MAX_PAYLOAD_SIZE] = {0};
+        *(radio_cmd_t *)tx_payload = cmd;
         nrf24_send(tx_payload, sizeof(tx_payload)); /* melhor esforço */
 
         uint8_t rx_payload[NRF24_MAX_PAYLOAD_SIZE];
         ret = nrf24_receive(rx_payload, sizeof(rx_payload), K_MSEC(100));
         static int64_t radio_lost_time = 0;
-        
-        static bool handshake = false;
-        
-        if (ret >= 0) {
-            uint16_t dist_cm;
-            int16_t duty_l, duty_r;
 
-            unpack_telemetry(rx_payload, &dist_cm, &duty_l, &duty_r);
-            printk("dist=%3ucm dutyL=%5d dutyR=%5d\n", dist_cm, duty_l, duty_r);
-            
+        static bool handshake = false;
+
+        if (ret >= 0) {
+            radio_telemetry_t telem = *(const radio_telemetry_t *)rx_payload;
+            printk("dist=%3ucm dutyL=%5d dutyR=%5d\n", telem.dist_cm, telem.duty_l, telem.duty_r);
+
             radio_lost_time = 0;
             handshake = true;
             gpio_pin_set_dt(&led_red, 0);

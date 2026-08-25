@@ -56,13 +56,13 @@
 #include <device.h>
 #include <drivers/gpio.h>
 #include <sys/printk.h>
-#include <string.h>
 
 #include "pwm_z42.h"
 #include "motor.h"
 #include "ultrassom.h"
 #include "nrf24.h"
 #include "control_fsm.h"
+#include "../../protocol.h"
 
 /* ── Pinmap — ver ../Pinmap.md ─────────── */
 #define MOTOR_L_IN1_PORT DEVICE_DT_GET(DT_NODELABEL(gpioc))
@@ -107,41 +107,6 @@
 static motor_t motor_l;
 static motor_t motor_r;
 static ultrassom_t sensor;
-
-/*
- * Formato de payload — ainda tentativo (6 de 32 bytes usados nos
- * comandos, 6 na telemetria). Só estas 4 funções conhecem o layout,
- * então trocar o protocolo depois não exige mexer no resto.
- *
- *   comando (controle -> carrinho):
- *     byte 0: auto_mode (0/1)
- *     byte 1: freio (0/1)
- *     byte 2-3: motor_l (int16_t, little-endian)
- *     byte 4-5: motor_r (int16_t, little-endian)
- *
- *   telemetria (carrinho -> controle):
- *     byte 0-1: distancia em cm (uint16_t, little-endian; 0xFFFF = sem eco)
- *     byte 2-3: duty motor_l em milésimos (-1000..1000, int16_t)
- *     byte 4-5: duty motor_r em milésimos (-1000..1000, int16_t)
- */
-static void unpack_cmd(const uint8_t *payload, control_cmd_t *cmd)
-{
-    cmd->auto_mode = payload[0] != 0;
-    cmd->freio = payload[1] != 0;
-    cmd->motor_l = (int16_t)(payload[2] | (payload[3] << 8));
-    cmd->motor_r = (int16_t)(payload[4] | (payload[5] << 8));
-}
-
-static void pack_telemetry(uint8_t *payload, uint16_t dist_cm, int16_t duty_l, int16_t duty_r)
-{
-    memset(payload, 0, NRF24_MAX_PAYLOAD_SIZE);
-    payload[0] = (uint8_t)(dist_cm & 0xFF);
-    payload[1] = (uint8_t)(dist_cm >> 8);
-    payload[2] = (uint8_t)(duty_l & 0xFF);
-    payload[3] = (uint8_t)(duty_l >> 8);
-    payload[4] = (uint8_t)(duty_r & 0xFF);
-    payload[5] = (uint8_t)(duty_r >> 8);
-}
 
 void main()
 {
@@ -197,16 +162,24 @@ void main()
 
     printk("PSI3422 Exp2_PSI3422 — carrinho pronto\n");
 
-    control_cmd_t cmd = { .auto_mode = true }; /* começa em modo seguro */
+    radio_cmd_t cmd = { .auto_mode = 1 }; /* começa em modo seguro */
     control_fsm_heartbeat();
 
     for (;;) {
+        /*
+         * O rádio é configurado (nrf24_init) com payload fixo de
+         * NRF24_MAX_PAYLOAD_SIZE (32) nos dois lados — nrf24_receive()
+         * exige um buffer de pelo menos esse tamanho e sempre lê os
+         * 32 bytes inteiros, então o buffer de rádio continua sendo
+         * uint8_t[32]; radio_cmd_t/radio_telemetry_t (protocol.h) só
+         * descrevem os bytes que de fato importam no início dele.
+         */
         uint8_t rx_payload[NRF24_MAX_PAYLOAD_SIZE];
-        uint8_t tx_payload[NRF24_MAX_PAYLOAD_SIZE];
+        uint8_t tx_payload[NRF24_MAX_PAYLOAD_SIZE] = {0};
 
         ret = nrf24_receive(rx_payload, sizeof(rx_payload), K_MSEC(100));
         if (ret >= 0) {
-            unpack_cmd(rx_payload, &cmd);
+            cmd = *(const radio_cmd_t *)rx_payload;
             control_fsm_heartbeat();
             
             static int rx_cnt = 0;
@@ -247,7 +220,9 @@ void main()
         int16_t out_l = (int16_t)(motor_get_duty(&motor_l) * 1000.0f);
         int16_t out_r = (int16_t)(motor_get_duty(&motor_r) * 1000.0f);
 
-        pack_telemetry(tx_payload, dist, out_l, out_r);
+        *(radio_telemetry_t *)tx_payload = (radio_telemetry_t){
+            .dist_cm = dist, .duty_l = out_l, .duty_r = out_r,
+        };
         nrf24_send(tx_payload, sizeof(tx_payload));
 
         static int loop_cnt = 0;

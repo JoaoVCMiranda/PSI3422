@@ -9,16 +9,16 @@ void control_fsm_heartbeat()
     last_heartbeat_ms = k_uptime_get();
 }
 
-bool control_fsm_watchdog(control_cmd_t *cmd)
+bool control_fsm_watchdog(radio_cmd_t *cmd)
 {
     if (k_uptime_get() - last_heartbeat_ms > CONTROL_FSM_TIMEOUT_MS) {
-        cmd->auto_mode = true;
+        cmd->auto_mode = 1;
         return true;
     }
     return false;
 }
 
-void control_fsm_apply(const control_cmd_t *cmd,
+void control_fsm_apply(const radio_cmd_t *cmd,
                         motor_t *motor_l, motor_t *motor_r,
                         ultrassom_t *sensor)
 {
