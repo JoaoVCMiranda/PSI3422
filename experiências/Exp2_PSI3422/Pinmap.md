@@ -32,6 +32,11 @@ Nem SPI nem TPM têm nó de devicetree neste port (Zephyr 2.7.1 empacotado pelo 
 | Rádio — IRQ | PTD2 | GPIO entrada, interrupção ativa em LOW |
 | LED status (vermelho/verde) | PTB18 / PTB19 | Active low |
 | Console (UART0) | PTA1/PTA2 | fixo, reservado, `printk` + comandos via `script/controle_serial.py` |
+| Joystick — X | PTB0 | ADC0_SE8, `adc_channel_cfg`/`adc_sequence` (padrão de `PSI3441/entregas/4`) |
+| Joystick — Y | PTB1 | ADC0_SE9, idem |
+| Joystick — Botão de freio | PTB2 | GPIO entrada, pull-up interno, active low |
+
+Pinos do joystick: não passaram por build real (`pio run`) ainda, só pelo padrão comprovado do PSI3441 Ativ.4 — nesta bancada o eixo já foi visto travado em 3,3 V/4095 (ver aviso em `Controle/src/main.c`).
 
 ## TPM disponível
 

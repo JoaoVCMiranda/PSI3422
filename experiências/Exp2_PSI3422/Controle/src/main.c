@@ -15,6 +15,7 @@
 #include <device.h>
 #include <drivers/gpio.h>
 #include <drivers/uart.h>
+#include <drivers/adc.h>
 #include <sys/printk.h>
 #include <string.h>
 
@@ -34,6 +35,52 @@
 #define LED_GREEN_PORT DEVICE_DT_GET(DT_NODELABEL(gpiob))
 #define LED_GREEN_PIN  19  /* PTB19 */
 
+/*
+ * ── Joystick (ADC) ───────────────────────────────────────────
+ * X=PTB0 (ADC0_SE8), Y=PTB1 (ADC0_SE9), freio=PTB2 (GPIO, botão).
+ * Padrão de aquisição (adc_channel_cfg + adc_sequence de 1 canal,
+ * lido sob demanda) copiado de PSI3441/entregas/4/src/main.c —
+ * mesma placa/framework, só trocamos "acender LED" por "converter em
+ * velocidade de motor".
+ *
+ * AVISO: nesta bancada o eixo do joystick já foi visto preso em
+ * 3,3 V / 4095 (potenciômetro ou fiação com defeito). Com hardware
+ * bom, zona morta em torno do centro evita drift; com hardware
+ * defeituoso, ml/mr vão saturar e o joystick some com o controle por
+ * UART — confira a leitura antes de confiar neste caminho.
+ */
+#define JOYSTICK_ADC_RESOLUTION 12
+#define JOYSTICK_CENTER         2048
+#define JOYSTICK_DEADZONE       200
+#define JOYSTICK_X_CHANNEL      8   /* PTB0 = ADC0_SE8 */
+#define JOYSTICK_Y_CHANNEL      9   /* PTB1 = ADC0_SE9 */
+#define JOYSTICK_BTN_PORT DEVICE_DT_GET(DT_NODELABEL(gpiob))
+#define JOYSTICK_BTN_PIN  2   /* PTB2, botão de freio */
+
+static const struct adc_channel_cfg joystick_x_cfg = {
+    .gain             = ADC_GAIN_1,
+    .reference        = ADC_REF_VDD_1,
+    .acquisition_time = ADC_ACQ_TIME_DEFAULT,
+    .channel_id       = JOYSTICK_X_CHANNEL,
+    .differential     = 0,
+};
+static const struct adc_channel_cfg joystick_y_cfg = {
+    .gain             = ADC_GAIN_1,
+    .reference        = ADC_REF_VDD_1,
+    .acquisition_time = ADC_ACQ_TIME_DEFAULT,
+    .channel_id       = JOYSTICK_Y_CHANNEL,
+    .differential     = 0,
+};
+
+static const struct device *joystick_adc;
+static struct gpio_dt_spec joystick_btn;
+static bool joystick_hw_ready;
+static int16_t joystick_adc_buf;
+static struct adc_sequence joystick_seq = {
+    .buffer      = &joystick_adc_buf,
+    .buffer_size = sizeof(joystick_adc_buf),
+    .resolution  = JOYSTICK_ADC_RESOLUTION,
+};
 
 #define VELOCIDADE_PADRAO 16000
 #define VELOCIDADE_GIRO   12000
@@ -61,6 +108,47 @@ static void unpack_telemetry(const uint8_t *payload, uint16_t *dist_cm, int16_t 
     *dist_cm = (uint16_t)(payload[0] | (payload[1] << 8));
     *duty_l = (int16_t)(payload[2] | (payload[3] << 8));
     *duty_r = (int16_t)(payload[4] | (payload[5] << 8));
+}
+
+static int16_t clamp_motor(int32_t v)
+{
+    if (v > INT16_MAX) return INT16_MAX;
+    if (v < INT16_MIN) return INT16_MIN;
+    return (int16_t)v;
+}
+
+/* raw 0..4095 (centro ~2048) -> -32768..32752, com zona morta central */
+static int16_t adc_to_motor(int32_t raw)
+{
+    int32_t centered = raw - JOYSTICK_CENTER;
+    if (centered > -JOYSTICK_DEADZONE && centered < JOYSTICK_DEADZONE) {
+        return 0;
+    }
+    return clamp_motor(centered * 16);
+}
+
+/* Y = aceleração, X = curva; mixagem arcade (mesma convenção de key_to_cmd). */
+static void joystick_read(int16_t *ml, int16_t *mr, bool *brk)
+{
+    if (!joystick_hw_ready) {
+        *ml = 0;
+        *mr = 0;
+        *brk = false;
+        return;
+    }
+
+    joystick_seq.channels = BIT(JOYSTICK_X_CHANNEL);
+    int32_t x_raw = (adc_read(joystick_adc, &joystick_seq) == 0) ? joystick_adc_buf : JOYSTICK_CENTER;
+
+    joystick_seq.channels = BIT(JOYSTICK_Y_CHANNEL);
+    int32_t y_raw = (adc_read(joystick_adc, &joystick_seq) == 0) ? joystick_adc_buf : JOYSTICK_CENTER;
+
+    int32_t throttle = adc_to_motor(y_raw);
+    int32_t turn     = adc_to_motor(x_raw);
+
+    *ml = clamp_motor(throttle + turn);
+    *mr = clamp_motor(throttle - turn);
+    *brk = gpio_pin_get_dt(&joystick_btn) > 0; /* GPIO_ACTIVE_LOW já inverte: pressionado = 1 */
 }
 
 /*
@@ -115,6 +203,19 @@ void main()
         gpio_pin_configure_dt(&led_green, GPIO_OUTPUT_INACTIVE);
     }
 
+    joystick_btn = (struct gpio_dt_spec){
+        .port = JOYSTICK_BTN_PORT, .pin = JOYSTICK_BTN_PIN, .dt_flags = GPIO_ACTIVE_LOW
+    };
+    joystick_adc = DEVICE_DT_GET(DT_NODELABEL(adc0));
+    joystick_hw_ready = device_is_ready(joystick_adc) && device_is_ready(joystick_btn.port);
+    if (joystick_hw_ready) {
+        gpio_pin_configure_dt(&joystick_btn, GPIO_INPUT | GPIO_PULL_UP);
+        adc_channel_setup(joystick_adc, &joystick_x_cfg);
+        adc_channel_setup(joystick_adc, &joystick_y_cfg);
+    } else {
+        printk("AVISO: ADC/GPIO do joystick indisponivel, so UART vai funcionar\n");
+    }
+
     printk("\n==================================\n");
     printk("=== BOOTING CONTROLE APP       ===\n");
     printk("==================================\n");
@@ -128,7 +229,7 @@ void main()
 
 
     printk("\n=== PSI3422 Exp2_PSI3422 -- controle ===\n");
-    //printk("Joystick ativado (PTB0=X, PTB1=Y, PTB2=Botao de Freio)\n");
+    printk("Joystick ativado (PTB0=X, PTB1=Y, PTB2=Botao de Freio)\n");
     printk("UART fallback: w/a/s/d = mover, x/espaco = frear, q = ponto morto, o = modo automatico\n\n");
 
     control_cmd_t cmd = { .auto_mode = true }; /* começa em modo seguro */
@@ -143,11 +244,9 @@ void main()
             int16_t ml = 0;
             int16_t mr = 0;
             bool brk = false;
-            
-            // Joystick físico está com defeito (lendo 3.3V / 4095 fixo), 
-            // então desabilitamos a leitura do ADC para permitir o uso da UART.
-            // joystick_read(&ml, &mr, &brk);
-            
+
+            joystick_read(&ml, &mr, &brk);
+
             if (brk || ml != 0 || mr != 0) {
                 // Joystick takes priority if it's being used
                 cmd.auto_mode = false;
