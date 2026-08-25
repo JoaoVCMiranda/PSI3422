@@ -13,3 +13,19 @@ Validado na Exp2_PSI3422 (Carrinho e Controle, comunicação bidirecional com ha
 ## spi/
 
 Driver SPI0 bare-metal (acesso direto a registrador via CMSIS) para KL25Z, do Prof. Gustavo Rehder — necessário pelo mesmo motivo do `nrf24/`: sem nó SPI na devicetree deste port, `spi_dt_spec` não compila. Incorporado verbatim a partir do material de referência da disciplina (pasta `update/` entregue pela professora).
+
+## pwm_z42/
+
+Driver TPM bare-metal (acesso direto a registrador via CMSIS/MKL25Z4.h) do Prof. Gustavo Rehder, de 2017, anterior a este curso ter adotado Zephyr. Necessário porque a API `pwm_dt_spec` do Zephyr só escreve o duty (`TPM_CnV`) e não tem como reconfigurar o período (`TPM_MOD`) em runtime — e, neste port `frdm_kl25z` especificamente, não há nó de devicetree para TPM de forma alguma. Já reaproveitado em outra disciplina (PSI3441, Ativ.5, radar) além da Exp2_PSI3422 (motores do Carrinho) — motivo de estar aqui e não dentro de um projeto só. Ver o comentário no topo de `pwm_z42.h` para o racional completo.
+
+## motor/
+
+Motor DC via ponte H (L298N ou similar): 2 GPIOs de direção (Zephyr nativo) + 1 canal PWM de velocidade (via `pwm_z42/`, acima). Totalmente parametrizado por quem inicializa (`gpio_dt_spec` dos pinos de direção, `TPM_MemMapPtr`/canal/período do TPM já configurado) — não assume nenhum pino fixo, então serve para qualquer robô com a mesma topologia de ponte H, não só o Carrinho da Exp2.
+
+Validado na Exp2_PSI3422 (Carrinho, dois motores independentes para curvas).
+
+## ultrassom/
+
+Leitura do HC-SR04 (trigger + echo) por interrupção de borda no pino de echo (não por polling, para não bloquear a CPU durante o eco). Também parametrizado via `gpio_dt_spec` de trigger/echo, sem pino fixo.
+
+Validado na Exp2_PSI3422 (Carrinho, detecção de obstáculos).
