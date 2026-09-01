@@ -1,0 +1,23 @@
+/*
+ * gpioc e gpioe vêm com status="disabled" por padrão neste board
+ * (dts/arm/nxp/nxp_kl25z.dtsi) — só gpioa/b/d são habilitados pelo
+ * frdm_kl25z.dts. O carrinho usa PTC (motores, CSN/SCK/MOSI/MISO do
+ * rádio) e PTE (IRQ do rádio), então precisam ser ligados aqui.
+ *
+ * Este Zephyr (2.7.1, empacotado pelo PlatformIO) não faz
+ * auto-discovery de boards/<board>.overlay como versões mais novas —
+ * este arquivo só é aplicado porque platformio.ini passa
+ * -DDTC_OVERLAY_FILE explicitamente (ver board_build.zephyr.cmake_extra_args).
+ *
+ * TPM e SPI não aparecem aqui porque não têm nó de devicetree neste
+ * port (ver comentário no topo de src/main.c) — pwm_z42/spi.c
+ * acessam os registradores direto via CMSIS, sem passar pela
+ * devicetree.
+ */
+&gpioc {
+	status = "okay";
+};
+
+&gpioe {
+	status = "okay";
+};
