@@ -16,9 +16,11 @@ gera, de forma determinística:
 - `Pinmap.md` — tabela por board (substitui a manutenção manual
   duplicada em `experiências/Exp2_PSI3422/Pinmap.md` e
   `experiências/Exp4_PSI3422/pinmap.md`).
-- `kicad/PSI3422_shield.kicad_sym` — símbolo KiCad do shield, ver
-  `kicad/README.md` pro próximo passo (KiCad não está instalado nesta
-  máquina, símbolo não verificado abrindo de verdade).
+- `kicad/PSI3422_shield.kicad_sym` — símbolo KiCad do shield, ainda
+  não reconciliado com o projeto KiCad de verdade (`kicad/Aula3_PCB.*`,
+  movido de `experiências/Exp3_PSI3422/Kicad/`) — ver `kicad/README.md`
+  pro estado de cada um e o próximo passo (validar no KiCad, que já
+  está instalado nesta máquina agora, e unificar os dois símbolos).
 
 Editar `pinmap.yaml`, nunca os três arquivos gerados.
 
@@ -70,9 +72,11 @@ confirmado, ver `experiências/Exp2_PSI3422/PENDENCIAS.md`) — UART
   `i`/`c` novos, sem teste com hardware.
 - **Chassi 3D**: decisão adiada (`experiências/Exp3_PSI3422/`,
   `modelo_1`/`modelo_2`) — fora do escopo desta rodada.
-- **Esquemático/layout de PCB completo**: `kicad/PSI3422_shield.kicad_sym`
-  cobre só o que dá pra derivar do portmap; colocar footprints dos
-  módulos e rotear é manual, ver `kicad/README.md`.
+- **PCB**: `kicad/Aula3_PCB.kicad_pcb` já tem uma placa roteada, mas o
+  esquemático (`.kicad_sch`) está praticamente vazio e o símbolo
+  gerado (`PSI3422_shield.kicad_sym`) ainda não foi conciliado com o
+  símbolo real (`FRDM-KL25Z.kicad_sym`) usado nela — validar abrindo
+  no KiCad (já instalado) é o próximo passo, ver `kicad/README.md`.
 - **Distância "salva"**: acumulador em RAM (`odometria_pose_t`), não
   sobrevive a reboot — suficiente pro roteiro por decisão explícita
   (sem NVS/flash).
