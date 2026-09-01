@@ -1,0 +1,547 @@
+
+(kicad_symbol_lib (version 20211014) (generator kicad_symbol_editor)
+  (symbol "FRDM-KL25Z" (pin_names (offset 1.016)) (in_bom yes) (on_board yes)
+    (property "Reference" "J" (id 0) (at -25.4 26.162 0)
+      (effects (font (size 1.27 1.27)) (justify bottom left))
+    )
+    (property "Value" "FRDM-KL25Z" (id 1) (at -25.4 -78.74 0)
+      (effects (font (size 1.27 1.27)) (justify bottom left))
+    )
+    (property "Footprint" "FRDM-KL25Z:FRDM-KL25Z" (id 2) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "MF" "NXP Semiconductors" (id 4) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "Description" "\n                        \n                            KL1x, KL2x, mbed-Enabled Development Freedom Kinetis ARM® Cortex®-M0+ MCU 32-Bit Embedded Evaluation Board\n                        \n" (id 5) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "Package" "None" (id 6) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "Price" "None" (id 7) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "SnapEDA_Link" "https://www.snapeda.com/parts/FRDM-KL25Z/NXP+Semiconductors/view-part/?ref=snap" (id 8) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "MP" "FRDM-KL25Z" (id 9) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "Availability" "In Stock" (id 10) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (property "Check_prices" "https://www.snapeda.com/parts/FRDM-KL25Z/NXP+Semiconductors/view-part/?ref=eda" (id 11) (at 0 0 0)
+      (effects (font (size 1.27 1.27)) (justify bottom) hide)
+    )
+    (symbol "FRDM-KL25Z_0_0"
+      (rectangle (start -25.4 -76.2) (end 10.16 25.4)
+        (stroke (width 0.254)) (fill (type background))
+      )
+      (pin bidirectional line (at 15.24 22.86 180.0) (length 5.08)
+        (name "PTA1"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-2"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 20.32 180.0) (length 5.08)
+        (name "PTA2"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-4"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 17.78 180.0) (length 5.08)
+        (name "PTA4"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-10"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 15.24 180.0) (length 5.08)
+        (name "PTA5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-12"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 12.7 180.0) (length 5.08)
+        (name "PTA12"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-8"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 10.16 180.0) (length 5.08)
+        (name "PTA13"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-2"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 7.62 180.0) (length 5.08)
+        (name "PTA16"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-9"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 0.0 180.0) (length 5.08)
+        (name "PTB0"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-2"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -2.54 180.0) (length 5.08)
+        (name "PTB1"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-4"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -5.08 180.0) (length 5.08)
+        (name "PTB2"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-6"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -7.62 180.0) (length 5.08)
+        (name "PTB3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-8"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -10.16 180.0) (length 5.08)
+        (name "PTB8"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-1"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -12.7 180.0) (length 5.08)
+        (name "PTB9"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-3"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -15.24 180.0) (length 5.08)
+        (name "PTB10"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-5"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -17.78 180.0) (length 5.08)
+        (name "PTB11"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-7"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 22.86 0) (length 5.08)
+        (name "PTC0"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-3"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 20.32 0) (length 5.08)
+        (name "PTC1"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-12"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 17.78 0) (length 5.08)
+        (name "PTC2"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-10"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 15.24 0) (length 5.08)
+        (name "PTC3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-5"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 12.7 0) (length 5.08)
+        (name "PTC4"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-7"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 10.16 0) (length 5.08)
+        (name "PTC5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-9"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 7.62 0) (length 5.08)
+        (name "PTC6"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-11"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 5.08 0) (length 5.08)
+        (name "PTC7"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-1"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 2.54 0) (length 5.08)
+        (name "PTC8"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-14"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 0.0 0) (length 5.08)
+        (name "PTC9"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-16"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -2.54 0) (length 5.08)
+        (name "PTC10"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-13"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -5.08 0) (length 5.08)
+        (name "PTC11"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-15"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -7.62 0) (length 5.08)
+        (name "PTC12"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-1"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -10.16 0) (length 5.08)
+        (name "PTC13"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-3"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -12.7 0) (length 5.08)
+        (name "PTC16"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-5"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -15.24 0) (length 5.08)
+        (name "PTC17"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-7"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -20.32 0) (length 5.08)
+        (name "PTD0"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-6"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -22.86 0) (length 5.08)
+        (name "PTD1"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-12"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -25.4 0) (length 5.08)
+        (name "PTD2"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-8"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -27.94 0) (length 5.08)
+        (name "PTD3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-10"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -30.48 0) (length 5.08)
+        (name "PTD4"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J1-6"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -33.02 0) (length 5.08)
+        (name "PTD5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-4"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -35.56 0) (length 5.08)
+        (name "PTD6"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-17"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -38.1 0) (length 5.08)
+        (name "PTD7"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-19"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -43.18 0) (length 5.08)
+        (name "PTE0"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-20"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -45.72 0) (length 5.08)
+        (name "PTE1"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-18"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -48.26 0) (length 5.08)
+        (name "PTE2"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-9"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -50.8 0) (length 5.08)
+        (name "PTE3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-11"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -53.34 0) (length 5.08)
+        (name "PTE4"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-13"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -55.88 0) (length 5.08)
+        (name "PTE5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-15"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -58.42 0) (length 5.08)
+        (name "PTE20"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-1"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -60.96 0) (length 5.08)
+        (name "PTE21"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-3"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -63.5 0) (length 5.08)
+        (name "PTE22"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-5"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -66.04 0) (length 5.08)
+        (name "PTE23"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-7"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -68.58 0) (length 5.08)
+        (name "PTE29"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-9"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -71.12 0) (length 5.08)
+        (name "PTE30"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J10-11"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at -30.48 -73.66 0) (length 5.08)
+        (name "PTE31"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-13"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -38.1 180.0) (length 5.08)
+        (name "GND"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-14"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -38.1 180.0) (length 5.08) hide
+        (name "GND"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-12"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -38.1 180.0) (length 5.08) hide
+        (name "GND"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-14"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -40.64 180.0) (length 5.08)
+        (name "P3V3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-4"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -40.64 180.0) (length 5.08) hide
+        (name "P3V3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-8"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -43.18 180.0) (length 5.08)
+        (name "VREFH"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-16"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -48.26 180.0) (length 5.08)
+        (name "P5V_USB"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-10"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -45.72 180.0) (length 5.08)
+        (name "P5-9V_VIN"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-16"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -50.8 180.0) (length 5.08)
+        (name "RESET/PTA20"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-6"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 -53.34 180.0) (length 5.08)
+        (name "SDA_PTD5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J9-2"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line (at 15.24 5.08 180.0) (length 5.08)
+        (name "PTA17"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "J2-11"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+    )
+  )
+)
