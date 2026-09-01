@@ -1,13 +1,22 @@
 /*
  * PSI3422 — Exp4_PSI3422 / CarrinhoBase
  *
- * Aula 4, escopo desta entrega: só ponte H (motor_l/motor_r, lib
- * compartilhada `motor/`) + dois contadores de volta com sinal
- * (encoder_l/encoder_r, lib nova `encoder/` — ver lib/SPEC.md).
- * Calibração de distância e curvas de 90° ficam para depois; aqui só
- * se demonstra que o sinal do contador acompanha o sentido comandado
- * ao motor da mesma roda (frente soma, ré subtrai), conforme o
- * racional em lib/encoder/encoder.h.
+ * Aula 4: ponte H (motor_l/motor_r, lib `motor/`) + dois contadores
+ * de volta com sinal (encoder_l/encoder_r, lib nova `encoder/`) +
+ * odometria diferencial (lib nova `odometria/`) — ângulo girado e
+ * distância percorrida a partir dos dois contadores, a "questão de
+ * programação competitiva" do roteiro. Ver lib/SPEC.md pras três.
+ * Curvas de 90° calibradas ficam para depois (já dá pra saber o
+ * ângulo girado via odometria_pose_t.theta_rad, falta só o controle
+ * de motor que para ao atingir o ângulo alvo).
+ *
+ * Calibração medida em bancada (ver control/relatorio-aula-4.md,
+ * "Calibragem Inicial e Estudos Pendentes"): raio da roda = 5 cm
+ * (circunferência = 2*pi*0,05 ≈ 0,31416 m) e distância entre rodas =
+ * 20 cm. Só falta confirmar PULSOS_POR_VOLTA (assumido 1, marco de
+ * papel na roda) girando a roda manualmente N voltas em bancada —
+ * com isso, tanto theta_rad quanto distancia_percorrida_m já usam
+ * constantes medidas, não mais placeholder.
  *
  * Pinagem: ver ../pinmap.md. Mesmo pinmap de motores da
  * Exp2_PSI3422/Carrinho; encoders em PTD1 (L) / PTD3 (R), já
@@ -23,6 +32,7 @@
 #include "pwm_z42.h"
 #include "motor.h"
 #include "encoder.h"
+#include "odometria.h"
 
 /* ── Pinmap dos motores — ver ../pinmap.md ── */
 #define MOTOR_L_IN1_PORT DEVICE_DT_GET(DT_NODELABEL(gpioc))
@@ -51,10 +61,17 @@
 #define DEMO_DUTY (INT16_MAX / 2) /* ~50%, mesmo valor usado no debug/EncoderCheck da Exp2 */
 #define DEMO_LEG_MS 3000          /* duração de cada trecho frente/ré */
 
+/* ── Calibração da odometria — ver lib/odometria/odometria.h ── */
+#define DISTANCIA_ENTRE_RODAS_M 0.20f /* medida em bancada, ver control/relatorio-aula-4.md */
+#define PULSOS_POR_VOLTA 1            /* marco de papel fixado na roda, a confirmar em bancada */
+#define RODA_RAIO_M 0.05f /* medido em bancada: 5 cm de raio */
+#define RODA_CIRCUNFERENCIA_M (2.0f * 3.14159265f * RODA_RAIO_M) /* 2*pi*raio, calculada a partir da medida acima — só constante literal, sem libm/<math.h> */
+
 static motor_t motor_l;
 static motor_t motor_r;
 static encoder_t encoder_l;
 static encoder_t encoder_r;
+static odometria_pose_t pose;
 
 void main(void)
 {
@@ -93,9 +110,18 @@ void main(void)
     ret = encoder_init(&encoder_r, &enc_r, &motor_r);
     if (ret < 0) { printk("ERRO: encoder_init(R) = %d\n", ret); return; }
 
-    printk("\n=== Exp4_PSI3422 CarrinhoBase -- ponte H + contadores com sinal ===\n");
+    odometria_calibracao_t calib = {
+        .circunferencia_roda_m = RODA_CIRCUNFERENCIA_M,
+        .distancia_entre_rodas_m = DISTANCIA_ENTRE_RODAS_M,
+        .pulsos_por_volta = PULSOS_POR_VOLTA,
+    };
+    odometria_init(&pose);
+
+    printk("\n=== Exp4_PSI3422 CarrinhoBase -- ponte H + contadores com sinal + odometria ===\n");
     printk("Levante o carrinho do chao. Frente 3s, re 3s, repete.\n");
-    printk("Contador esperado: sobe em frente, desce em re.\n\n");
+    printk("Contador esperado: sobe em frente, desce em re.\n");
+    printk("Calibracao: raio roda=5cm (circ=%dmm), dist.entre rodas=%dmm, pulsos/volta=%d (a confirmar em bancada).\n\n",
+           (int)(RODA_CIRCUNFERENCIA_M * 1000.0f), (int)(DISTANCIA_ENTRE_RODAS_M * 1000.0f), PULSOS_POR_VOLTA);
 
     bool indo_frente = true;
 
@@ -108,7 +134,15 @@ void main(void)
 
         for (int t = 0; t < DEMO_LEG_MS; t += 1000) {
             k_msleep(1000);
-            printk("pulsos: L=%d  R=%d\n", encoder_get(&encoder_l), encoder_get(&encoder_r));
+
+            int32_t delta_l = encoder_reset(&encoder_l);
+            int32_t delta_r = encoder_reset(&encoder_r);
+            odometria_atualiza(&pose, &calib, delta_l, delta_r);
+
+            printk("pulsos: L=%d  R=%d | theta=%d mrad | dist.percorrida~=%d mm\n",
+                   delta_l, delta_r,
+                   (int)(pose.theta_rad * 1000.0f),
+                   (int)(pose.distancia_percorrida_m * 1000.0f));
         }
 
         indo_frente = !indo_frente;

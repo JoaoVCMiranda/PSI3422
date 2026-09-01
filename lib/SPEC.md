@@ -32,8 +32,16 @@ Validado na Exp2_PSI3422 (Carrinho, detecção de obstáculos).
 
 ## encoder/
 
-Contador de pulsos assinado para o encoder IR HW-201 (disco ranhurado + par emissor/receptor IR, canal único — não é quadratura). Por interrupção de borda de subida no OUT do sensor, igual ao `ultrassom/` acima. Como um canal só não diz sozinho o sentido de giro, `encoder_init()` recebe um ponteiro `const motor_t *` (ver `motor/`, acima) da mesma roda, e a ISR lê `motor->speed` a cada pulso para decidir se soma (frente) ou subtrai (ré) — comando em ponto morto/freio (`speed == 0`) ignora o pulso, para não contar vibração residual como rotação. Depende de `motor/` por isso (inclui `motor.h`); não depende de `pwm_z42/` diretamente.
+Contador de pulsos assinado para o encoder IR HW-201 (par emissor/receptor IR, canal único — não é quadratura). Nesta bancada o "disco" é um marco de papel fixado na roda, não o disco ranhurado de fábrica — 1 pulso por volta completa (a confirmar, ver `odometria/` abaixo). Por interrupção de borda de subida no OUT do sensor, igual ao `ultrassom/` acima. Como um canal só não diz sozinho o sentido de giro, `encoder_init()` recebe um ponteiro `const motor_t *` (ver `motor/`, acima) da mesma roda, e a ISR lê `motor->speed` a cada pulso para decidir se soma (frente) ou subtrai (ré) — comando em ponto morto/freio (`speed == 0`) ignora o pulso, para não contar vibração residual como rotação. Depende de `motor/` por isso (inclui `motor.h`); não depende de `pwm_z42/` diretamente.
 
 Pinos reservados nesta subfamília KL25Z precisam estar em PORTA ou PORTC/PORTD — PORTB/PORTE não geram interrupção por mudança de pino (confirmado em bancada, ver `debug/EncoderCheck` na Exp2_PSI3422).
 
 Contagem de pulsos por segundo validada em bancada por `debug/EncoderCheck` (Exp2_PSI3422), antes do sinal de sentido existir. Lib com sentido introduzida na Exp4_PSI3422 (Aula 4).
+
+## odometria/
+
+Odometria diferencial: converte a variação de pulsos de cada roda (de `encoder/`, acima) em ângulo girado e distância total percorrida do carrinho — a "questão de programação competitiva" do roteiro da Aula 4. Pura aritmética (sem `<math.h>`/libm, sem seno/cosseno) e sem nenhum `#include` de Zephyr — não depende de board nem de framework, então é a lib mais portável do repositório, candidata natural pra um port futuro em ESP32 (ver `experiências/Exp4_PSI3422/debug/IRHW201_ESP32`, ainda não iniciado). Não rastreia posição (x, y) no plano — não pedido pelo roteiro, e exigiria seno/cosseno.
+
+Constantes de calibração (`odometria_calibracao_t`, preenchidas por quem chama, ver `CarrinhoBase/src/main.c`): distância entre rodas medida em bancada (0,20 m); circunferência da roda a partir do raio medido em bancada (5 cm → 2*pi*0,05 ≈ 0,31416 m); pulsos por volta (1, marco de papel fixado na roda, ainda a confirmar girando a roda manualmente N voltas).
+
+Introduzida na Exp4_PSI3422 (Aula 4), junto com `encoder/`. Validada apenas por leitura de código nesta sessão — mesma ressalva de build do `encoder/`, ver `control/relatorio-aula-4.md`.
