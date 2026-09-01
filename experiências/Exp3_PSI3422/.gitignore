@@ -1,0 +1,10 @@
+# Fonte de referência baixada (pesada demais p/ versionar) — só a peça
+# extraída (assets/2wd_robot/chassis_plate.stl) entra no repo.
+assets/2wd_robot/2wd_robot.stl
+assets/2wd_robot/2wd_robot.blend
+
+# Artefatos gerados pelo OpenSCAD (regeneráveis a partir dos .scad)
+exports/
+
+# Symlink local para os exemplos do OpenSCAD (não é conteúdo do projeto)
+assets/examples
