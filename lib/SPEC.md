@@ -29,3 +29,11 @@ Validado na Exp2_PSI3422 (Carrinho, dois motores independentes para curvas).
 Leitura do HC-SR04 (trigger + echo) por interrupção de borda no pino de echo (não por polling, para não bloquear a CPU durante o eco). Também parametrizado via `gpio_dt_spec` de trigger/echo, sem pino fixo.
 
 Validado na Exp2_PSI3422 (Carrinho, detecção de obstáculos).
+
+## encoder/
+
+Contador de pulsos assinado para o encoder IR HW-201 (disco ranhurado + par emissor/receptor IR, canal único — não é quadratura). Por interrupção de borda de subida no OUT do sensor, igual ao `ultrassom/` acima. Como um canal só não diz sozinho o sentido de giro, `encoder_init()` recebe um ponteiro `const motor_t *` (ver `motor/`, acima) da mesma roda, e a ISR lê `motor->speed` a cada pulso para decidir se soma (frente) ou subtrai (ré) — comando em ponto morto/freio (`speed == 0`) ignora o pulso, para não contar vibração residual como rotação. Depende de `motor/` por isso (inclui `motor.h`); não depende de `pwm_z42/` diretamente.
+
+Pinos reservados nesta subfamília KL25Z precisam estar em PORTA ou PORTC/PORTD — PORTB/PORTE não geram interrupção por mudança de pino (confirmado em bancada, ver `debug/EncoderCheck` na Exp2_PSI3422).
+
+Contagem de pulsos por segundo validada em bancada por `debug/EncoderCheck` (Exp2_PSI3422), antes do sinal de sentido existir. Lib com sentido introduzida na Exp4_PSI3422 (Aula 4).
