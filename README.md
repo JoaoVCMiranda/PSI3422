@@ -46,7 +46,7 @@ Observações:
 Última atualização: terça-feira, 11 ago. 2026, 09:19 
 
 ### Aula 3 
-- [ ] Por Fazer
+- [X] Ficou massa!
 Objetivos:
 
     Criar uma placa de circuito impresso para interconectar os módulos que serão usados no carrinho.

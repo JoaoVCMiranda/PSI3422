@@ -66,7 +66,7 @@ hcsr04_footprint_xy               = [45, 20]; // [X, Y] — 45 ao longo de X (pe
 hcsr04_hole_spacing                = 16;       // ao longo de X, mesmo eixo da maior dimensão
 hcsr04_hole_d                       = 2.5;
 hcsr04_height                        = 20;
-hcsr04_position                       = [0, 42]; // entre a borda da PCB (y~30) e o rodízio (y~56) — frente da chapa
+hcsr04_position                       = [0, 78]; // entre a borda da PCB (y~30) e o rodízio (y~56) — frente da chapa
 
 // --- FRDM-KL25Z ---
 // Montada ACIMA do shield de PCB (não mais direto na chapa) — ver

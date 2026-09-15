@@ -3,11 +3,23 @@
  *
  * Consolidação de produção: 2 motores DC (ponte H dupla) + ultrassom
  * HC-SR04 + rádio nRF24L01+ (base: experiências/Exp2_PSI3422/Carrinho)
- * com encoders IR HW-201 + odometria diferencial somados por cima
- * (base: experiências/Exp4_PSI3422/CarrinhoBase) — cobre o roteiro das
+ * com encoder IR HW-201 + odometria somados por cima (base:
+ * experiências/Exp4_PSI3422/CarrinhoBase) — cobre o roteiro das
  * Aulas 5/6 (README.md raiz): RUN/STOP remotos, travessia de
  * labirinto por desvio reativo, distância percorrida que nunca
  * decresce, comando de apagar. Board: FRDM-KL25Z.
+ *
+ * Só ENCODER_R está no pinmap atual (ver ../../pinmap.yaml) — o
+ * carrinho não tem mais o encoder esquerdo fisicamente montado.
+ * lib/odometria continua a mesma (odometria diferencial, dois
+ * deltas) — sem modificar o contrato dela (ver lib/SPEC.md), o delta
+ * da roda direita é passado pros dois parâmetros, assumindo as rodas
+ * andando junto (mesmo PWM nos dois motores fora de curva). Efeito:
+ * `pose.theta_rad` fica sempre 0 (d_dir - d_esq cancela) — não tem
+ * problema porque nada usa esse campo hoje (só
+ * `distancia_percorrida_m` vai pra telemetria); `distancia_percorrida_m`
+ * continua correta porque colapsa pra |d_dir| quando os dois deltas
+ * são iguais.
  *
  * Pinos: ver ../../pinmap.h (gerado por ../../tools/gen_pinmap.py a
  * partir de ../../pinmap.yaml — fonte única também do símbolo KiCad
@@ -51,19 +63,22 @@
 #define TPM_MOTOR_MOD 3999U
 
 /* ── Calibração da odometria — medida em bancada, ver
- * experiências/Exp4_PSI3422/CarrinhoBase/src/main.c e
- * control/relatorio-aula-4.md (raio/dist. entre rodas medidos;
- * pulsos/volta=1, marco de papel na roda, a confirmar girando N
- * voltas em bancada). ── */
-#define DISTANCIA_ENTRE_RODAS_M 0.20f
+ * ../README.md ("Parâmetros do carrinho": 17cm entre rodas, roda de
+ * raio 3,5cm — este último bate com motor_wheel_diameter=68,92mm em
+ * experiências/Exp3_PSI3422/modelo_3/parts/params.scad, medido do
+ * .blend). Substitui os valores antigos (20cm/5cm) herdados de
+ * experiências/Exp4_PSI3422/CarrinhoBase/src/main.c, que eram
+ * estimativa, não medição do chassi real. pulsos/volta=1 (marco de
+ * papel na roda) continua a confirmar girando N voltas em bancada —
+ * ver control/relatorio-aula-4.md. ── */
+#define DISTANCIA_ENTRE_RODAS_M 0.17f
 #define PULSOS_POR_VOLTA 1
-#define RODA_RAIO_M 0.05f
+#define RODA_RAIO_M 0.035f
 #define RODA_CIRCUNFERENCIA_M (2.0f * 3.14159265f * RODA_RAIO_M)
 
 static motor_t motor_l;
 static motor_t motor_r;
 static ultrassom_t sensor;
-static encoder_t encoder_l;
 static encoder_t encoder_r;
 static odometria_pose_t pose;
 
@@ -75,7 +90,6 @@ void main()
     struct gpio_dt_spec r_in2 = { .port = MOTOR_R_IN2_PORT, .pin = MOTOR_R_IN2_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
     struct gpio_dt_spec trig  = { .port = ULTRASSOM_TRIG_PORT, .pin = ULTRASSOM_TRIG_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
     struct gpio_dt_spec echo  = { .port = ULTRASSOM_ECHO_PORT, .pin = ULTRASSOM_ECHO_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
-    struct gpio_dt_spec enc_l = { .port = ENCODER_L_PORT, .pin = ENCODER_L_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
     struct gpio_dt_spec enc_r = { .port = ENCODER_R_PORT, .pin = ENCODER_R_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
     struct gpio_dt_spec ce    = { .port = RADIO_CE_PORT, .pin = RADIO_CE_PIN, .dt_flags = GPIO_ACTIVE_HIGH };
     struct gpio_dt_spec csn   = { .port = RADIO_CSN_PORT, .pin = RADIO_CSN_PIN, .dt_flags = GPIO_ACTIVE_LOW };
@@ -113,10 +127,8 @@ void main()
     if (ret < 0) { printk("ERRO: ultrassom_init = %d\n", ret); return; }
 
     /* encoder_init depois de motor_init: a ISR do encoder lê motor->speed,
-     * então o motor associado precisa já existir (não precisa girar ainda). */
-    ret = encoder_init(&encoder_l, &enc_l, &motor_l);
-    if (ret < 0) { printk("ERRO: encoder_init(L) = %d\n", ret); return; }
-
+     * então o motor associado precisa já existir (não precisa girar ainda).
+     * Só ENCODER_R existe fisicamente (ver comentário no topo do arquivo). */
     ret = encoder_init(&encoder_r, &enc_r, &motor_r);
     if (ret < 0) { printk("ERRO: encoder_init(R) = %d\n", ret); return; }
 
@@ -193,10 +205,13 @@ void main()
 
         control_fsm_apply(&cmd, &motor_l, &motor_r, &sensor);
 
-        /* ── Odometria: delta de pulsos desde o último ciclo (~50ms) ── */
-        int32_t delta_l = encoder_reset(&encoder_l);
+        /* ── Odometria: delta de pulsos desde o último ciclo (~50ms) ──
+         * Só ENCODER_R existe fisicamente: o delta dele é passado pros
+         * dois parâmetros de odometria_atualiza (ver comentário no topo
+         * do arquivo — theta_rad fica sempre 0, distancia_percorrida_m
+         * continua correta). */
         int32_t delta_r = encoder_reset(&encoder_r);
-        odometria_atualiza(&pose, &odo_calib, delta_l, delta_r);
+        odometria_atualiza(&pose, &odo_calib, delta_r, delta_r);
 
         /* "Apagar distância": borda de apagar_seq (não nível) — ver
          * comentário em protocol.h sobre por que é contador, não flag. */

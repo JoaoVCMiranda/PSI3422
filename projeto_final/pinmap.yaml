@@ -30,8 +30,8 @@
 pins:
   # ── Motores (só Carrinho) ────────────────────────────────────────
   - nome: MOTOR_L_IN1
-    porta: C
-    pino: 8
+    porta: D
+    pino: 0
     tipo: gpio
     direcao: saida
     boards: [carrinho]
@@ -44,22 +44,22 @@ pins:
     boards: [carrinho]
     obs: Ponte H, direção do motor esquerdo (lib/motor)
   - nome: MOTOR_L_ENA
-    porta: A
-    pino: 4
+    porta: D
+    pino: 2
     tipo: pwm
     direcao: pwm
     canal_tpm: 1
     boards: [carrinho]
     obs: TPM0_CH1, velocidade do motor esquerdo, via lib/pwm_z42
   - nome: MOTOR_R_IN1
-    porta: A
-    pino: 12
+    porta: C
+    pino: 8
     tipo: gpio
     direcao: saida
     boards: [carrinho]
     obs: Ponte H, direção do motor direito (lib/motor)
   - nome: MOTOR_R_IN2
-    porta: D
+    porta: A
     pino: 5
     tipo: gpio
     direcao: saida
@@ -67,7 +67,7 @@ pins:
     obs: Ponte H, direção do motor direito (lib/motor)
   - nome: MOTOR_R_ENB
     porta: A
-    pino: 5
+    pino: 4
     tipo: pwm
     direcao: pwm
     canal_tpm: 2
@@ -77,14 +77,14 @@ pins:
   # ── Ultrassom HC-SR04 (só Carrinho) ──────────────────────────────
   - nome: ULTRASSOM_TRIG
     porta: D
-    pino: 0
+    pino: 3
     tipo: gpio
     direcao: saida
     boards: [carrinho]
     obs: HC-SR04 trigger (lib/ultrassom)
   - nome: ULTRASSOM_ECHO
     porta: D
-    pino: 4
+    pino: 1
     tipo: gpio
     direcao: entrada_irq
     boards: [carrinho]
@@ -104,8 +104,8 @@ pins:
     boards: [carrinho]
     obs: IR HW-201 esquerda (lib/encoder)
   - nome: ENCODER_R
-    porta: D
-    pino: 3
+    porta: A
+    pino: 16
     tipo: gpio
     direcao: entrada_irq
     boards: [carrinho]
@@ -113,43 +113,43 @@ pins:
 
   # ── Rádio nRF24L01+ (Carrinho e Controle) ────────────────────────
   - nome: RADIO_SCK
-    porta: C
-    pino: 5
+    porta: D
+    pino: 6
     tipo: doc
     direcao: fixo
     boards: [carrinho, controle]
     obs: SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h
   - nome: RADIO_MOSI
-    porta: C
-    pino: 6
+    porta: B
+    pino: 9
     tipo: doc
     direcao: fixo
     boards: [carrinho, controle]
     obs: idem RADIO_SCK
   - nome: RADIO_MISO
-    porta: C
+    porta: D
     pino: 7
     tipo: doc
     direcao: fixo
     boards: [carrinho, controle]
     obs: idem RADIO_SCK
   - nome: RADIO_CSN
-    porta: C
-    pino: 4
+    porta: B
+    pino: 10
     tipo: gpio
     direcao: saida
     boards: [carrinho, controle]
     obs: chip-select manual do nRF24 (lib/nrf24)
   - nome: RADIO_CE
-    porta: A
-    pino: 13
+    porta: E
+    pino: 31
     tipo: gpio
     direcao: saida
     boards: [carrinho, controle]
     obs: lib/nrf24
   - nome: RADIO_IRQ
-    porta: D
-    pino: 2
+    porta: B
+    pino: 8
     tipo: gpio
     direcao: entrada_irq
     boards: [carrinho, controle]
