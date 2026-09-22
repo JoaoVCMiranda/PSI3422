@@ -9,7 +9,7 @@
  * labirinto por desvio reativo, distância percorrida que nunca
  * decresce, comando de apagar. Board: FRDM-KL25Z.
  *
- * Só ENCODER_R está no pinmap atual (ver ../../pinmap.yaml) — o
+ * Só ENCODER_R está no pinmap atual (ver ../../pinmap_carrinho.yaml) — o
  * carrinho não tem mais o encoder esquerdo fisicamente montado.
  * lib/odometria continua a mesma (odometria diferencial, dois
  * deltas) — sem modificar o contrato dela (ver lib/SPEC.md), o delta
@@ -21,9 +21,13 @@
  * continua correta porque colapsa pra |d_dir| quando os dois deltas
  * são iguais.
  *
- * Pinos: ver ../../pinmap.h (gerado por ../../tools/gen_pinmap.py a
- * partir de ../../pinmap.yaml — fonte única também do símbolo KiCad
- * em ../../kicad/). Protocolo de rádio: ../../protocol.h.
+ * Pinos: ver ../../pinmap_carrinho.h (gerado por
+ * ../../tools/gen_pinmap.py a partir de ../../pinmap_carrinho.yaml —
+ * pinmap desta PCB específica, já fabricada; ../../pinmap.yaml
+ * "atual" vale só pro Controle, fiado à mão depois de um fix de
+ * RADIO_SCK/MOSI/MISO que não se aplica a uma placa já pronta — ver
+ * cabeçalho de ../../pinmap_carrinho.yaml). Protocolo de rádio:
+ * ../../protocol.h.
  *
  * ── Arquitetura híbrida (GPIO Zephyr nativo, PWM/SPI bare-metal) e
  * por que um laço síncrono só (sem thread de rádio dedicada) ──
@@ -55,7 +59,7 @@
 #include "nrf24.h"
 #include "control_fsm.h"
 #include "../../protocol.h"
-#include "../../pinmap.h"
+#include "../../pinmap_carrinho.h"
 
 /* TPM0 compartilhado pelos 2 canais de PWM dos motores: MCGIRCLK (4MHz,
  * independente do PLL) / PS_1 -> f_tpm = 4MHz; MOD=3999 -> f_pwm = 1kHz
@@ -120,7 +124,10 @@ void main()
     ret = motor_init(&motor_l, &l_in1, &l_in2, TPM0, MOTOR_L_ENA_CH, TPM_MOTOR_MOD);
     if (ret < 0) { printk("ERRO: motor_init(L) = %d\n", ret); return; }
 
-    ret = motor_init(&motor_r, &r_in1, &r_in2, TPM0, MOTOR_R_ENB_CH, TPM_MOTOR_MOD);
+    /* r_in2/r_in1 invertidos (não r_in1/r_in2): motor R girava ao
+     * contrário do esperado em bancada — fix de orientação validado
+     * em debug_projeto_final ("orientar rodas"), propagado aqui. */
+    ret = motor_init(&motor_r, &r_in2, &r_in1, TPM0, MOTOR_R_ENB_CH, TPM_MOTOR_MOD);
     if (ret < 0) { printk("ERRO: motor_init(R) = %d\n", ret); return; }
 
     ret = ultrassom_init(&sensor, &trig, &echo);
