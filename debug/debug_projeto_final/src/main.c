@@ -5,16 +5,13 @@
  * (motor+encoder+rádio) com debug_ponte_H_control_curvas_distancia
  * (ultrassom+decisão de 4 faixas via lib/volante), agora usando
  * ../../projeto_final/pinmap_carrinho.h/protocol.h DE VERDADE em vez
- * de pinos hardcoded — este board é a PCB já fabricada, roteada em
- * cima do pinmap de antes do fix de RADIO_SCK/MOSI/MISO (commit
- * 6e70945) — ver pinmap_carrinho.yaml pro porquê de ser um arquivo
- * separado de pinmap.yaml (que agora vale só pro Controle, fiado à
- * mão depois do fix). Motor/encoder/ultrassom/CE/CSN/IRQ/LED são
- * idênticos nos dois pinmaps — só RADIO_SCK/MOSI/MISO diverge, e
- * esses três são tipo=doc (spi_init() não lê pinmap.h pra eles), CE/
- * CSN/IRQ continuam OK independente de qual pinmap. Candidato a
- * substituir projeto_final/Carrinho/src/main.c depois de validado em
- * bancada (ver "Divergências encontradas" abaixo).
+ * de pinos hardcoded. pinmap_carrinho.yaml (não pinmap.yaml) é a
+ * referência única pros dois lados (Carrinho e Controle) agora — é o
+ * pinmap de antes do fix de RADIO_SCK/MOSI/MISO (commit 6e70945),
+ * que é o que está na PCB de verdade. debug_projeto_final_controle
+ * também inclui pinmap_carrinho.h, não pinmap.h (ver esse arquivo).
+ * Candidato a substituir projeto_final/Carrinho/src/main.c (que já
+ * foi migrado separadamente) depois de validado em bancada.
  *
  * Diferenças em relação a projeto_final/Carrinho/src/main.c:
  *   - Desvio/freio/manual passam por lib/volante (volante_frente/re/
@@ -29,16 +26,19 @@
  *     control_fsm.c de produção — aqui nem existe o risco, a decisão
  *     usa a mesma leitura que vai pra telemetria).
  *
- * Divergências encontradas entre pinmap.yaml e o que os debug_ponte_H_*
- * anteriores tinham hardcoded (pedido explícito: reportar qualquer
- * divergência): NENHUMA. Motor L/R (IN1/IN2/ENA/ENB, canais TPM já
- * com o fix de MOTOR_L_ENA_CH/MOTOR_R_ENB_CH), ultrassom, encoder
- * direito, rádio (CE/CSN/IRQ) e LEDs batem pino a pino com
- * projeto_final/pinmap.yaml. O único ponto sem reconciliação
- * conhecida é o símbolo KiCad vs. o esquemático real da PCB — ver
- * projeto_final/kicad/README.md (não é pinmap.yaml, é o desenho da
- * placa; roteiro de verificação já documentado lá, não repetido
- * aqui).
+ * Ajustes de bancada (sessão de 22/09/2026):
+ *   - motor_init(&motor_r, &r_in2, &r_in1, ...): orientação do motor
+ *     R invertida (girava ao contrário do esperado).
+ *   - PULSOS_POR_VOLTA 1 -> 7: recalibrado contra o encoder/disco de
+ *     verdade (1 era estimativa nunca validada).
+ *   - k_msleep(50) -> k_msleep(150) no fim do loop: dá tempo do
+ *     carrinho completar o pivô de curva/ré antes da próxima decisão.
+ *
+ * Divergências entre pinmap_carrinho.yaml e o que os debug_ponte_H_*
+ * anteriores tinham hardcoded: NENHUMA nos pinos GPIO/PWM/encoder
+ * (conferido pino a pino) — só RADIO_SCK/MOSI/MISO diverge do
+ * pinmap.yaml "atual" (não deste arquivo), e são tipo=doc, sem define
+ * gerado (spi_init() não lê pinmap.h pra eles).
  */
 
 #include <zephyr.h>
@@ -58,17 +58,21 @@
 
 #define TPM_MOTOR_MOD 3999U
 
-/* Mesma calibração de projeto_final/Carrinho/src/main.c — ver
- * "Parâmetros do carrinho" em projeto_final/README.md. */
+/* Mesma calibração de projeto_final/Carrinho/src/main.c, exceto
+ * PULSOS_POR_VOLTA — recalibrado em bancada pra 7 (era 1, estimativa
+ * de "marco de papel na roda" nunca validada contra este encoder/
+ * disco de verdade). */
 #define DISTANCIA_ENTRE_RODAS_M 0.17f
-#define PULSOS_POR_VOLTA 1
+#define PULSOS_POR_VOLTA 7
 #define RODA_RAIO_M 0.035f
 #define RODA_CIRCUNFERENCIA_M (2.0f * 3.14159265f * RODA_RAIO_M)
 
-/* TRIM_L: validado em debug_ponte_H/debug_ponte_H_encoder — ver
- * lib/volante/volante.h. */
-#define TRIM_L 3000
-#define VELOCIDADE_AUTO (INT16_MAX / 2)
+/* TRIM_L/VELOCIDADE_AUTO: recalibrados em bancada (eram 3000 e
+ * INT16_MAX/2) — ver lib/volante/volante.h. aplica_trim() satura em
+ * INT16_MAX/INT16_MIN, então TRIM_L alto com VELOCIDADE_AUTO no
+ * limite não estoura, só clampa. */
+#define TRIM_L 11000
+#define VELOCIDADE_AUTO INT16_MAX
 
 /* Mesmas 3 faixas de projeto_final/Carrinho/lib/control_fsm/control_fsm.h
  * — controle não usa o header pra não puxar radio_cmd_t indiretamente
@@ -263,6 +267,10 @@ void main(void)
             }
         }
 
-        k_msleep(50);
+        /* 150ms (era 50ms): dá tempo do carrinho completar o pivô de
+         * curva/ré antes da próxima leitura de ultrassom decidir de
+         * novo — com 50ms o ciclo de decisão era mais rápido que a
+         * manobra física, cortando a curva pela metade. */
+        k_msleep(150);
     }
 }

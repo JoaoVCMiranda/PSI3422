@@ -3,10 +3,14 @@
  *
  * Par do debug_projeto_final (Carrinho) — mesma ideia:
  * debug_ponte_H_encoder_radio_controle, agora com
- * ../../projeto_final/pinmap.h/protocol.h de verdade em vez de pinos
- * hardcoded (a PCB foi feita em cima de pinmap.yaml). Sem joystick de
- * propósito (defeito de hardware conhecido, ver PENDENCIAS.md do
- * Exp2 — nem ADC nem botão são lidos aqui).
+ * ../../projeto_final/pinmap_carrinho.h/protocol.h de verdade em vez
+ * de pinos hardcoded. Usa pinmap_carrinho.h (não pinmap.h) — mesma
+ * referência única do Carrinho agora (pinmap de antes do fix de
+ * RADIO_SCK/MOSI/MISO, commit 6e70945, que é o que está na PCB de
+ * verdade — ver debug_projeto_final/src/main.c e
+ * projeto_final/pinmap_carrinho.yaml). Sem joystick de propósito
+ * (defeito de hardware conhecido, ver PENDENCIAS.md do Exp2 — nem ADC
+ * nem botão são lidos aqui).
  *
  * Mantém o fix de ordem do loop já validado em
  * debug_ponte_H_encoder_radio_controle: escuta ANTES de mandar
@@ -26,7 +30,7 @@
 
 #include "nrf24.h"
 #include "../../../projeto_final/protocol.h"
-#include "../../../projeto_final/pinmap.h"
+#include "../../../projeto_final/pinmap_carrinho.h"
 
 #define VELOCIDADE_PADRAO 16000
 #define VELOCIDADE_GIRO   12000
@@ -141,17 +145,15 @@ void main(void)
         if (ret >= 0) {
             last_telem = *(const radio_telemetry_t *)rx_payload;
 
-            /* throttle pra não afogar o serial monitor (ciclo real é
-             * ~20-170ms dependendo de quanto nrf24_receive espera) */
-            static int print_cnt = 0;
-            if (++print_cnt % 10 == 0) {
-                if (last_telem.dist_cm == 0xFFFF) {
-                    printk("obstaculo=sem_eco percorrida=%ucm comando=%s\n",
-                           last_telem.dist_percorrida_cm, cmd_to_str(&cmd));
-                } else {
-                    printk("obstaculo=%ucm percorrida=%ucm comando=%s\n",
-                           last_telem.dist_cm, last_telem.dist_percorrida_cm, cmd_to_str(&cmd));
-                }
+            /* Sem throttle por enquanto (era 1 a cada 10) — telemetria
+             * ainda em debug, melhor ver toda recepção que sobrar do
+             * pouco throttle escondendo uma conexão esparsa. */
+            if (last_telem.dist_cm == 0xFFFF) {
+                printk("obstaculo=sem_eco percorrida=%ucm comando=%s\n",
+                       last_telem.dist_percorrida_cm, cmd_to_str(&cmd));
+            } else {
+                printk("obstaculo=%ucm percorrida=%ucm comando=%s\n",
+                       last_telem.dist_cm, last_telem.dist_percorrida_cm, cmd_to_str(&cmd));
             }
 
             handshake = true;
