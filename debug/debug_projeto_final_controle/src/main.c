@@ -3,12 +3,13 @@
  *
  * Par do debug_projeto_final (Carrinho) — mesma ideia:
  * debug_ponte_H_encoder_radio_controle, agora com
- * ../../projeto_final/pinmap_carrinho.h/protocol.h de verdade em vez
- * de pinos hardcoded. Usa pinmap_carrinho.h (não pinmap.h) — mesma
- * referência única do Carrinho agora (pinmap de antes do fix de
- * RADIO_SCK/MOSI/MISO, commit 6e70945, que é o que está na PCB de
- * verdade — ver debug_projeto_final/src/main.c e
- * projeto_final/pinmap_carrinho.yaml). Sem joystick de propósito
+ * ../../projeto_final/pinmap.h/protocol.h de verdade em vez de pinos
+ * hardcoded. Volta a usar pinmap.h (não pinmap_carrinho.h) — ver
+ * comentário equivalente em debug_projeto_final/src/main.c: os fios
+ * de SCK/MOSI/MISO do módulo nRF24 foram movidos pra PTC5/PTC6/PTC7
+ * nos dois boards depois que nrf24_read_status() mostrou 0xFF travado
+ * com o módulo em PTD6/PTB9/PTD7 (SPI0 de hardware só existe em
+ * PORTC/PORTA nesta família de chip). Sem joystick de propósito
  * (defeito de hardware conhecido, ver PENDENCIAS.md do Exp2 — nem ADC
  * nem botão são lidos aqui).
  *
@@ -30,7 +31,7 @@
 
 #include "nrf24.h"
 #include "../../../projeto_final/protocol.h"
-#include "../../../projeto_final/pinmap_carrinho.h"
+#include "../../../projeto_final/pinmap.h"
 
 #define VELOCIDADE_PADRAO 16000
 #define VELOCIDADE_GIRO   12000

@@ -9,7 +9,7 @@
  * labirinto por desvio reativo, distância percorrida que nunca
  * decresce, comando de apagar. Board: FRDM-KL25Z.
  *
- * Só ENCODER_R está no pinmap atual (ver ../../pinmap_carrinho.yaml) — o
+ * Só ENCODER_R está no pinmap atual (ver ../../pinmap.yaml) — o
  * carrinho não tem mais o encoder esquerdo fisicamente montado.
  * lib/odometria continua a mesma (odometria diferencial, dois
  * deltas) — sem modificar o contrato dela (ver lib/SPEC.md), o delta
@@ -21,13 +21,14 @@
  * continua correta porque colapsa pra |d_dir| quando os dois deltas
  * são iguais.
  *
- * Pinos: ver ../../pinmap_carrinho.h (gerado por
- * ../../tools/gen_pinmap.py a partir de ../../pinmap_carrinho.yaml —
- * pinmap desta PCB específica, já fabricada; ../../pinmap.yaml
- * "atual" vale só pro Controle, fiado à mão depois de um fix de
- * RADIO_SCK/MOSI/MISO que não se aplica a uma placa já pronta — ver
- * cabeçalho de ../../pinmap_carrinho.yaml). Protocolo de rádio:
- * ../../protocol.h.
+ * Pinos: ver ../../pinmap.h (gerado por ../../tools/gen_pinmap.py a
+ * partir de ../../pinmap.yaml). RADIO_SCK/MOSI/MISO do módulo nRF24
+ * foram movidos pra PTC5/PTC6/PTC7 em 22/09/2026 (nrf24_read_status()
+ * mostrava 0xFF travado com o módulo em PTD6/PTB9/PTD7 — SPI0 de
+ * hardware só existe em PORTC/PORTA nesta família de chip, nunca
+ * poderia alcançar PTD6/PTB9/PTD7; ver ../../pinmap_carrinho.yaml
+ * pro registro histórico do que a PCB tinha antes do rework).
+ * Protocolo de rádio: ../../protocol.h.
  *
  * ── Arquitetura híbrida (GPIO Zephyr nativo, PWM/SPI bare-metal) e
  * por que um laço síncrono só (sem thread de rádio dedicada) ──
@@ -59,7 +60,7 @@
 #include "nrf24.h"
 #include "control_fsm.h"
 #include "../../protocol.h"
-#include "../../pinmap_carrinho.h"
+#include "../../pinmap.h"
 
 /* TPM0 compartilhado pelos 2 canais de PWM dos motores: MCGIRCLK (4MHz,
  * independente do PLL) / PS_1 -> f_tpm = 4MHz; MOD=3999 -> f_pwm = 1kHz

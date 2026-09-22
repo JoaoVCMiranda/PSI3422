@@ -4,12 +4,21 @@
  * Passo final do debug gradual: une debug_ponte_H_encoder_radio_carrinho
  * (motor+encoder+rádio) com debug_ponte_H_control_curvas_distancia
  * (ultrassom+decisão de 4 faixas via lib/volante), agora usando
- * ../../projeto_final/pinmap_carrinho.h/protocol.h DE VERDADE em vez
- * de pinos hardcoded. pinmap_carrinho.yaml (não pinmap.yaml) é a
- * referência única pros dois lados (Carrinho e Controle) agora — é o
- * pinmap de antes do fix de RADIO_SCK/MOSI/MISO (commit 6e70945),
- * que é o que está na PCB de verdade. debug_projeto_final_controle
- * também inclui pinmap_carrinho.h, não pinmap.h (ver esse arquivo).
+ * ../../projeto_final/pinmap.h/protocol.h DE VERDADE em vez de pinos
+ * hardcoded.
+ *
+ * RADIO_SCK/MOSI/MISO: voltou a usar pinmap.h (não pinmap_carrinho.h)
+ * em 22/09/2026 — nrf24_read_status() (ver lib/nrf24/nrf24.h) mostrou
+ * status travado em 0xFF nos dois boards com o módulo fiado em
+ * PTD6/PTB9/PTD7 (valor de pinmap_carrinho.yaml/commit 6e70945): SPI0
+ * de hardware só existe em PORTC (ALT_0, usado por spi_init()) ou
+ * PORTA (ALT_1) nesta família de chip — PTD6/PTB9/PTD7 nunca poderia
+ * funcionar por SPI0, então os fios foram movidos pra PTC5/PTC6/PTC7
+ * nos dois boards (Carrinho e Controle), que é o que pinmap.h/
+ * spi_init(SPI_0, ALT_0, ...) já esperavam. pinmap_carrinho.yaml/.h
+ * ficam só como registro histórico do que a PCB tinha antes do
+ * rework — não são mais a referência ativa.
+ *
  * Candidato a substituir projeto_final/Carrinho/src/main.c (que já
  * foi migrado separadamente) depois de validado em bancada.
  *
@@ -54,7 +63,7 @@
 #include "volante.h"
 #include "nrf24.h"
 #include "../../../projeto_final/protocol.h"
-#include "../../../projeto_final/pinmap_carrinho.h"
+#include "../../../projeto_final/pinmap.h"
 
 #define TPM_MOTOR_MOD 3999U
 

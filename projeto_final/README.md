@@ -118,24 +118,22 @@ com os três rádios ligados juntos.
   (`nrf24_read_status()`) e de timing/protocolo levantados antes:
   aquilo tudo era irrelevante enquanto o rádio nem chegava a ser
   inicializado.
-- **Dois pinmaps agora (`pinmap.yaml` vs `pinmap_carrinho.yaml`)**:
-  a PCB do Carrinho já existia antes do fix de RADIO_SCK/MOSI/MISO
-  (item abaixo) e foi roteada em cima do pinmap de antes dele (commit
-  6e70945: PTD6/PTB9/PTD7); o Controle foi fiado à mão depois do fix,
-  em cima do `pinmap.yaml` atual (PTC5/PTC6/PTC7). `pinmap_carrinho.yaml`
-  é um fork só desses 3 pinos — motor/ultrassom/encoder/CE/CSN/IRQ/LED
-  continuam idênticos nos dois (`pinmap_carrinho.h` e `pinmap.h` só
-  diferem no include guard, ver diff). `tools/gen_pinmap.py` agora
-  aceita um YAML alternativo como argumento (`gen_pinmap.py
-  pinmap_carrinho.yaml`) e deriva os nomes de saída — comportamento
-  padrão (sem argumento) inalterado. **Ainda em aberto**: como
-  RADIO_SCK/MOSI/MISO são `tipo: doc` (sem define em pinmap.h),
-  reescrever o YAML sozinho não muda nenhum binário — se a PCB do
-  Carrinho really tem o nRF24 fiado em PTD6/PTB9/PTD7, nenhuma rota de
-  hardware SPI0/SPI1 da KL25Z alcança esses 3 pinos (só PORTC/PORTA
-  pro SPI0), então o Carrinho precisaria de SPI bit-banged nesses
-  pinos especificamente — ainda não implementado, decisão pendente até
-  confirmar em bancada (ver `nrf24_read_status()`, próximo item).
+- ~~**Dois pinmaps (`pinmap.yaml` vs `pinmap_carrinho.yaml`)**~~
+  RESOLVIDO (sessão de 22/09/2026): a hipótese era que a PCB do
+  Carrinho tinha o nRF24 fiado em PTD6/PTB9/PTD7 (commit 6e70945),
+  diferente do Controle (fiado à mão em PTC5/PTC6/PTC7, o que
+  `pinmap.yaml` atual documenta). `nrf24_read_status()` confirmou:
+  status travado em `0xFF` nos DOIS boards — SPI0 de hardware só
+  existe em PORTC/PORTA nesta família de chip, então PTD6/PTB9/PTD7
+  nunca poderia funcionar por SPI0 em nenhum dos dois. Os fios do
+  módulo nRF24 foram movidos fisicamente pra PTC5/PTC6/PTC7 nos dois
+  boards — `debug_projeto_final`, `debug_projeto_final_controle` e
+  `projeto_final/Carrinho` voltaram a usar `pinmap.h` (não
+  `pinmap_carrinho.h`). `pinmap_carrinho.yaml`/`.h`/`.md`/símbolo
+  KiCad ficam só como registro histórico do que a PCB tinha antes do
+  rework, não são mais a referência ativa. `tools/gen_pinmap.py`
+  continua aceitando um YAML alternativo como argumento, caso sirva
+  de novo no futuro.
 - ~~**RADIO_SCK/MOSI/MISO documentados errado em pinmap.yaml**~~
   RESOLVIDO (sessão de 22/09/2026): pinmap.yaml dizia PTD6/PTB9/PTD7,
   mas `nrf24_init()` chama `spi_init(SPI_0, ALT_0, ...)`
