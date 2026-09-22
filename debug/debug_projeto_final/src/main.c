@@ -121,7 +121,7 @@ void main(void)
 
     ret = motor_init(&motor_l, &l_in1, &l_in2, TPM0, MOTOR_L_ENA_CH, TPM_MOTOR_MOD);
     if (ret < 0) { printk("ERRO: motor_init(L) = %d\n", ret); return; }
-    ret = motor_init(&motor_r, &r_in1, &r_in2, TPM0, MOTOR_R_ENB_CH, TPM_MOTOR_MOD);
+    ret = motor_init(&motor_r, &r_in2, &r_in1, TPM0, MOTOR_R_ENB_CH, TPM_MOTOR_MOD);
     if (ret < 0) { printk("ERRO: motor_init(R) = %d\n", ret); return; }
 
     volante_init(&volante, &motor_l, &motor_r, TRIM_L);
