@@ -102,29 +102,18 @@ static struct gpio_dt_spec nrf24_ce;
 static struct gpio_dt_spec nrf24_csn;
 static struct gpio_dt_spec nrf24_irq;
 
-static struct k_sem nrf24_irq_sem;
-static struct gpio_callback nrf24_irq_callback;
-
 static const uint8_t nrf24_address[5] = { 0xE7, 0xE7, 0xE7, 0xE7, 0xE7 };
-
 
 /*
  * ============================================================
- * IRQ CALLBACK
+ * IRQ — SEM INTERRUPÇÃO DE VERDADE (ver nrf24_init())
  * ============================================================
+ * nrf24_send()/nrf24_receive() só fazem polling direto de
+ * gpio_pin_get_dt(&nrf24_irq) — nunca existiu um k_sem_take() em
+ * lugar nenhum deste arquivo pra consumir uma interrupção. O pino
+ * RADIO_IRQ só precisa estar configurado como GPIO_INPUT comum pra
+ * isso funcionar (ver nrf24_init()).
  */
-
-static void nrf24_irq_handler(const struct device *port,
-                               struct gpio_callback *cb,
-                               gpio_port_pins_t pins)
-{
-	ARG_UNUSED(port);
-	ARG_UNUSED(cb);
-	ARG_UNUSED(pins);
-
-	/* Não fazemos SPI dentro da interrupção — só avisamos a thread. */
-	k_sem_give(&nrf24_irq_sem);
-}
 
 
 /*
@@ -339,8 +328,6 @@ int nrf24_init(const struct gpio_dt_spec *ce,
 	nrf24_csn = *csn;
 	nrf24_irq = *irq;
 
-	k_sem_init(&nrf24_irq_sem, 0, 1);
-
 	if (!device_is_ready(nrf24_ce.port) ||
 	    !device_is_ready(nrf24_csn.port) ||
 	    !device_is_ready(nrf24_irq.port)) {
@@ -366,16 +353,26 @@ int nrf24_init(const struct gpio_dt_spec *ce,
 	ret = gpio_pin_configure_dt(&nrf24_ce, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) return ret;
 
+	/*
+	 * SÓ GPIO_INPUT comum — SEM interrupção de verdade. Bug histórico
+	 * corrigido em 2026-09-22: este código chamava
+	 * gpio_pin_interrupt_configure_dt(&nrf24_irq, GPIO_INT_EDGE_TO_ACTIVE)
+	 * aqui, e RADIO_IRQ é PTB8 (PORTB) — neste board/framework
+	 * (dts/arm/nxp/nxp_kl25z.dtsi), só gpioa (PORTA) e gpiod (PORTD)
+	 * têm a property `interrupts` na devicetree; gpiob/gpioc/gpioe
+	 * não. O driver Zephyr (drivers/gpio/gpio_mcux.c) só liga a flag
+	 * GPIO_INT_ENABLE quando essa property existe, e sem ela
+	 * gpio_pin_interrupt_configure() retorna -ENOTSUP (-134) pra
+	 * QUALQUER pino do port. Isso fazia nrf24_init() sempre abortar
+	 * bem aqui (por causa do `if (ret < 0) return ret;` que existia)
+	 * — nrf24_configure() nunca rodava, CE nunca ia pra 1: o rádio
+	 * nunca era configurado de verdade, em nenhum firmware, desde
+	 * sempre. A interrupção nem fazia falta: nrf24_send()/
+	 * nrf24_receive() só faziam (e continuam fazendo) polling direto
+	 * de gpio_pin_get_dt(&nrf24_irq) — nunca existiu um k_sem_take()
+	 * em lugar nenhum consumindo essa interrupção.
+	 */
 	ret = gpio_pin_configure_dt(&nrf24_irq, GPIO_INPUT);
-	if (ret < 0) return ret;
-
-	gpio_init_callback(&nrf24_irq_callback, nrf24_irq_handler, BIT(nrf24_irq.pin));
-
-	ret = gpio_add_callback(nrf24_irq.port, &nrf24_irq_callback);
-	if (ret < 0) return ret;
-
-	/* IRQ do nRF24 é ativo em LOW; GPIO_ACTIVE_LOW deve estar no dt_flags do spec */
-	ret = gpio_pin_interrupt_configure_dt(&nrf24_irq, GPIO_INT_EDGE_TO_ACTIVE);
 	if (ret < 0) return ret;
 
 	ret = nrf24_configure();

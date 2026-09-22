@@ -93,6 +93,31 @@ com os três rádios ligados juntos.
 
 ## Pendente (fora desta rodada)
 
+- ~~**`nrf24_init()` sempre retornava -134 (-ENOTSUP)**~~ RESOLVIDO
+  (sessão de 22/09/2026) — provável causa raiz de TODO o histórico de
+  "rádio não conecta" do projeto. `nrf24_init()` chamava
+  `gpio_pin_interrupt_configure_dt(&nrf24_irq, GPIO_INT_EDGE_TO_ACTIVE)`
+  em RADIO_IRQ (PTB8, PORTB). Neste board/framework
+  (`dts/arm/nxp/nxp_kl25z.dtsi`), só `gpioa` (PORTA) e `gpiod`
+  (PORTD) têm a property `interrupts` — `gpiob`/`gpioc`/`gpioe` não;
+  o driver (`drivers/gpio/gpio_mcux.c`) só liga `GPIO_INT_ENABLE`
+  quando essa property existe, e sem ela
+  `gpio_pin_interrupt_configure()` retorna `-ENOTSUP` (-134) pra
+  qualquer pino do port. Como RADIO_IRQ está em PORTB, essa chamada
+  **sempre falhava**, e o `if (ret < 0) return ret;` logo depois
+  fazia `nrf24_init()` abortar ali — `nrf24_configure()` (endereço,
+  canal, CRC) nunca rodava, CE nunca ia pra 1: o rádio nunca foi
+  configurado de verdade, em nenhum board, em nenhuma sessão. A
+  interrupção era código morto (o semáforo que ela dispararia nunca
+  era esperado em lugar nenhum — `nrf24_send()`/`nrf24_receive()` só
+  fazem polling direto de `gpio_pin_get_dt()`), removida de
+  `lib/nrf24/nrf24.c` — RADIO_IRQ agora só é `GPIO_INPUT` comum, sem
+  callback/interrupção. `pio run` verificado em todos os projetos que
+  usam `lib/nrf24` depois do fix. Ainda sem validação de bancada —
+  mas isso muda completamente a prioridade dos diagnósticos SPI
+  (`nrf24_read_status()`) e de timing/protocolo levantados antes:
+  aquilo tudo era irrelevante enquanto o rádio nem chegava a ser
+  inicializado.
 - **Dois pinmaps agora (`pinmap.yaml` vs `pinmap_carrinho.yaml`)**:
   a PCB do Carrinho já existia antes do fix de RADIO_SCK/MOSI/MISO
   (item abaixo) e foi roteada em cima do pinmap de antes dele (commit
