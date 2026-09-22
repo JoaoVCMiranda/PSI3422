@@ -1,0 +1,13 @@
+/*
+ * gpioc (motores) e gpioe (RADIO_CE) vêm "disabled" por padrão no
+ * dtsi do KL25Z — precisam estar "okay" ou o linker não gera o device
+ * (__device_dts_ord_*). Idêntico ao overlay de projeto_final/Carrinho
+ * (mesmo carrinho, mesmo pinmap.yaml).
+ */
+&gpioc {
+	status = "okay";
+};
+
+&gpioe {
+	status = "okay";
+};
