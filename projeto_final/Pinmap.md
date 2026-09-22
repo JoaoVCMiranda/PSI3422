@@ -12,10 +12,10 @@ fonte única, que também gera `pinmap.h` e o símbolo KiCad.
 |---|---|---|---|
 | MOTOR_L_IN1 | PTD0 | saida | Ponte H, direção do motor esquerdo (lib/motor) |
 | MOTOR_L_IN2 | PTC9 | saida | Ponte H, direção do motor esquerdo (lib/motor) |
-| MOTOR_L_ENA | PTD2 | pwm | TPM0_CH1, velocidade do motor esquerdo, via lib/pwm_z42 |
+| MOTOR_L_ENA | PTD2 | pwm | TPM0_CH2, velocidade do motor esquerdo, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c) |
 | MOTOR_R_IN1 | PTC8 | saida | Ponte H, direção do motor direito (lib/motor) |
 | MOTOR_R_IN2 | PTA5 | saida | Ponte H, direção do motor direito (lib/motor) |
-| MOTOR_R_ENB | PTA4 | pwm | TPM0_CH2, velocidade do motor direito, via lib/pwm_z42 |
+| MOTOR_R_ENB | PTA4 | pwm | TPM0_CH1, velocidade do motor direito, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c) |
 | ULTRASSOM_TRIG | PTD3 | saida | HC-SR04 trigger (lib/ultrassom) |
 | ULTRASSOM_ECHO | PTD1 | entrada_irq | HC-SR04 echo, interrupção de borda (lib/ultrassom) |
 | ENCODER_L | PTD1 | entrada_irq | IR HW-201 esquerda (lib/encoder) |

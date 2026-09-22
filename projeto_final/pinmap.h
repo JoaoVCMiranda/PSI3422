@@ -21,10 +21,10 @@
 #define MOTOR_L_IN2_PORT DEVICE_DT_GET(DT_NODELABEL(gpioc))
 #define MOTOR_L_IN2_PIN  9   /* PTC9 */
 
-/* MOTOR_L_ENA — TPM0_CH1, velocidade do motor esquerdo, via lib/pwm_z42 [carrinho] */
+/* MOTOR_L_ENA — TPM0_CH2, velocidade do motor esquerdo, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c) [carrinho] */
 #define MOTOR_L_ENA_GPIO GPIOD
-#define MOTOR_L_ENA_PIN  2   /* PTD2 = TPM0_CH1 */
-#define MOTOR_L_ENA_CH   1
+#define MOTOR_L_ENA_PIN  2   /* PTD2 = TPM0_CH2 */
+#define MOTOR_L_ENA_CH   2
 
 /* MOTOR_R_IN1 — Ponte H, direção do motor direito (lib/motor) [carrinho] */
 #define MOTOR_R_IN1_PORT DEVICE_DT_GET(DT_NODELABEL(gpioc))
@@ -34,10 +34,10 @@
 #define MOTOR_R_IN2_PORT DEVICE_DT_GET(DT_NODELABEL(gpioa))
 #define MOTOR_R_IN2_PIN  5   /* PTA5 */
 
-/* MOTOR_R_ENB — TPM0_CH2, velocidade do motor direito, via lib/pwm_z42 [carrinho] */
+/* MOTOR_R_ENB — TPM0_CH1, velocidade do motor direito, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c) [carrinho] */
 #define MOTOR_R_ENB_GPIO GPIOA
-#define MOTOR_R_ENB_PIN  4   /* PTA4 = TPM0_CH2 */
-#define MOTOR_R_ENB_CH   2
+#define MOTOR_R_ENB_PIN  4   /* PTA4 = TPM0_CH1 */
+#define MOTOR_R_ENB_CH   1
 
 /* ULTRASSOM_TRIG — HC-SR04 trigger (lib/ultrassom) [carrinho] */
 #define ULTRASSOM_TRIG_PORT DEVICE_DT_GET(DT_NODELABEL(gpiod))

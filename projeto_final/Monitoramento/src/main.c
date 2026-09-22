@@ -55,6 +55,9 @@ void main(void)
     if (ret < 0) {
         printk("ERRO: nrf24_init = %d. Monitoramento continuara tentando reconectar.\n", ret);
     }
+    /* Só-RX: nunca transmite, então não deve responder ACK junto com o
+     * Controle (ver nrf24_set_auto_ack() em lib/nrf24/nrf24.h). */
+    nrf24_set_auto_ack(false);
 
     printk("PSI3422 projeto_final -- monitoramento pronto (so recepcao, nao transmite)\n\n");
 
@@ -88,6 +91,7 @@ void main(void)
                 } else if (k_uptime_get() - radio_lost_time > 2000) {
                     printk("Reconectando modulo NRF24 do Monitoramento...\n");
                     nrf24_init(&ce, &csn, &irq);
+                    nrf24_set_auto_ack(false); /* nrf24_configure() religa EN_AA a cada init */
                     radio_lost_time = k_uptime_get(); /* tenta de novo em 2s */
                 }
             }

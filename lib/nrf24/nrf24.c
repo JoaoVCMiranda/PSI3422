@@ -392,6 +392,11 @@ int nrf24_init(const struct gpio_dt_spec *ce,
  * ============================================================
  */
 
+int nrf24_set_auto_ack(bool enable)
+{
+	return nrf24_write_register(NRF24_REG_EN_AA, enable ? BIT(0) : 0);
+}
+
 int nrf24_send(const uint8_t *data, size_t length)
 {
 	int ret;
@@ -481,8 +486,16 @@ int nrf24_receive(uint8_t *data, size_t max_length, k_timeout_t timeout)
 	ret = gpio_pin_set_dt(&nrf24_ce, 1);
 	if (ret < 0) return ret;
 
-	int64_t end_rx = k_uptime_get() + 100;
-	while (k_uptime_get() < end_rx && gpio_pin_get_dt(&nrf24_irq) == 0) {
+	/* `timeout` era ignorado aqui (sempre esperava 100ms fixo,
+	 * qualquer que fosse o valor passado) — sem efeito observável
+	 * enquanto todo chamador usa K_MSEC(100), mas quebraria em
+	 * silêncio um K_FOREVER/outro valor. K_TICKS_FOREVER é tratado à
+	 * parte porque k_ticks_to_ms_floor64() dele mais k_uptime_get()
+	 * estouraria o deadline. */
+	bool espera_infinita = (timeout.ticks == K_TICKS_FOREVER);
+	int64_t end_rx = espera_infinita ? 0 : k_uptime_get() + (int64_t)k_ticks_to_ms_floor64(timeout.ticks);
+
+	while ((espera_infinita || k_uptime_get() < end_rx) && gpio_pin_get_dt(&nrf24_irq) == 0) {
 		k_sleep(K_MSEC(1));
 	}
 	if (gpio_pin_get_dt(&nrf24_irq) == 0) {

@@ -93,6 +93,41 @@ com os três rádios ligados juntos.
 
 ## Pendente (fora desta rodada)
 
+- ~~**Canais PWM dos motores trocados**~~ RESOLVIDO (sessão de
+  22/09/2026): `debug/debug_ponte_H_encoder/src/main.c` já tinha
+  descoberto e corrigido isso em bancada ("MOTOR_L_ENA_CH/MOTOR_R_ENB_CH
+  estavam trocados"), mas a correção nunca voltou pro `pinmap.yaml` de
+  produção. Confirmado de forma independente contra o datasheet
+  (`MKL25Z128VLK4-pinctrl.dtsi`): PTD2 (MOTOR_L_ENA) é fisicamente
+  TPM0_CH2, não CH1; PTA4 (MOTOR_R_ENB) é TPM0_CH1, não CH2. Com os
+  canais trocados, o duty de cada motor saía fisicamente no pino do
+  *outro* motor (direção in1/in2 continuava certa — só a velocidade
+  ficava cruzada) — candidato forte pra explicar "carrinho anda torto"
+  (PENDENCIAS.md do Exp2). `pinmap.yaml` corrigido e
+  `pinmap.h`/`Pinmap.md` regerados via `gen_pinmap.py`; `pio run`
+  verificado nos três projetos depois do fix. Ainda sem confirmação em
+  bancada com o carrinho de verdade.
+- ~~**Leitura dupla do ultrassom em auto_mode**~~ RESOLVIDO (mesma
+  sessão): `Carrinho/src/main.c` já chama `ultrassom_read()` a cada
+  ciclo (telemetria); `control_fsm_apply()` chamava de novo
+  internamente em auto_mode, cada chamada bloqueando até
+  `ECHO_TIMEOUT_MS` (30ms) — quase dobrava a latência da malha de
+  desvio reativo. `control_fsm.c` agora reusa `sensor->distance` (já
+  atualizado por main.c) em vez de disparar o sensor de novo.
+- **`nrf24_receive(timeout)` era ignorado**: a implementação sempre
+  esperava 100ms fixos, não importa o valor passado — sem efeito
+  observável hoje (todo chamador usa `K_MSEC(100)`), mas quebraria em
+  silêncio um `K_FOREVER`/outro valor. Corrigido em `lib/nrf24/nrf24.c`
+  pra usar o `timeout` de verdade (`K_TICKS_FOREVER` tratado à parte).
+- **Colisão de ACK com 3 rádios (caveat do `Monitoramento/`)**:
+  mitigado, não eliminado — `lib/nrf24` ganhou `nrf24_set_auto_ack()`
+  (liga/desliga EN_AA sem reconfigurar o resto do rádio) e
+  `Monitoramento/src/main.c` desliga o próprio auto-ACK logo após
+  `nrf24_init()` (e de novo a cada reconexão). Como Monitoramento só
+  recebe, nunca precisou responder ACK — agora só o Controle responde,
+  eliminando a colisão por construção em vez de só confiar em
+  retransmissão. Ainda sem teste de bancada com os três rádios ligados
+  juntos.
 - ~~**Build verificado**~~ RESOLVIDO: causa raiz não era a máquina nem
   a instalação (pip vs. `uv tool install platformio`) — era
   `platform = freescalekinetis` sem versão em cada `platformio.ini`,

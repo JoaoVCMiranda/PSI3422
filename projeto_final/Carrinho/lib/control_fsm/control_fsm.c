@@ -27,7 +27,13 @@ void control_fsm_apply(const radio_cmd_t *cmd,
                         ultrassom_t *sensor)
 {
     if (cmd->auto_mode) {
-        float distance = ultrassom_read(sensor);
+        /* Não re-dispara o ultrassom aqui: main.c já chamou
+         * ultrassom_read(sensor) neste mesmo ciclo antes de
+         * control_fsm_apply() (telemetria também depende dela) — uma
+         * segunda leitura bloqueante (até ECHO_TIMEOUT_MS=30ms) só
+         * atrasaria a malha de controle sem trazer distância mais
+         * nova. */
+        float distance = sensor->distance;
 
         if (distance <= DISTANCIA_PARADA_M) {
             /* obstáculo colado — para completamente, sem tentar manobra */

@@ -48,9 +48,9 @@ pins:
     pino: 2
     tipo: pwm
     direcao: pwm
-    canal_tpm: 1
+    canal_tpm: 2
     boards: [carrinho]
-    obs: TPM0_CH1, velocidade do motor esquerdo, via lib/pwm_z42
+    obs: TPM0_CH2, velocidade do motor esquerdo, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c)
   - nome: MOTOR_R_IN1
     porta: C
     pino: 8
@@ -70,9 +70,9 @@ pins:
     pino: 4
     tipo: pwm
     direcao: pwm
-    canal_tpm: 2
+    canal_tpm: 1
     boards: [carrinho]
-    obs: TPM0_CH2, velocidade do motor direito, via lib/pwm_z42
+    obs: TPM0_CH1, velocidade do motor direito, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c)
 
   # ── Ultrassom HC-SR04 (só Carrinho) ──────────────────────────────
   - nome: ULTRASSOM_TRIG

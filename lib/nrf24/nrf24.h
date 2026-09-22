@@ -54,4 +54,18 @@ int nrf24_send(const uint8_t *data, size_t length);
  */
 int nrf24_receive(uint8_t *data, size_t max_length, k_timeout_t timeout);
 
+/**
+ * Liga/desliga auto-ACK (EN_AA, pipe 0) sem reconfigurar o resto do
+ * rádio. Uso: boards só-RX que nunca transmitem (ex.: Monitoramento)
+ * não devem responder ACK aos pacotes do Carrinho — nRF24_init()
+ * liga EN_AA por padrão (endereço/canal são compartilhados por todo o
+ * projeto), então um segundo receptor no ar responderia ACK junto com
+ * o Controle e poderia colidir no ar. Chamar depois de nrf24_init()
+ * (e de novo depois de cada reconexão, já que nrf24_configure()
+ * sempre liga EN_AA de novo).
+ *
+ * Retorno: 0 = sucesso, <0 = erro.
+ */
+int nrf24_set_auto_ack(bool enable);
+
 #endif /* NRF24_H */
