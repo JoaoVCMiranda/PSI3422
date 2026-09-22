@@ -4,11 +4,17 @@
  * Passo final do debug gradual: une debug_ponte_H_encoder_radio_carrinho
  * (motor+encoder+rádio) com debug_ponte_H_control_curvas_distancia
  * (ultrassom+decisão de 4 faixas via lib/volante), agora usando
- * ../../projeto_final/pinmap.h/protocol.h DE VERDADE em vez de pinos
- * hardcoded — a PCB foi feita em cima de pinmap.yaml, então este é o
- * primeiro firmware da série debug_ponte_H_* que roda no shield real.
- * Candidato a substituir projeto_final/Carrinho/src/main.c depois de
- * validado em bancada (ver "Divergências encontradas" abaixo).
+ * ../../projeto_final/pinmap_carrinho.h/protocol.h DE VERDADE em vez
+ * de pinos hardcoded — este board é a PCB já fabricada, roteada em
+ * cima do pinmap de antes do fix de RADIO_SCK/MOSI/MISO (commit
+ * 6e70945) — ver pinmap_carrinho.yaml pro porquê de ser um arquivo
+ * separado de pinmap.yaml (que agora vale só pro Controle, fiado à
+ * mão depois do fix). Motor/encoder/ultrassom/CE/CSN/IRQ/LED são
+ * idênticos nos dois pinmaps — só RADIO_SCK/MOSI/MISO diverge, e
+ * esses três são tipo=doc (spi_init() não lê pinmap.h pra eles), CE/
+ * CSN/IRQ continuam OK independente de qual pinmap. Candidato a
+ * substituir projeto_final/Carrinho/src/main.c depois de validado em
+ * bancada (ver "Divergências encontradas" abaixo).
  *
  * Diferenças em relação a projeto_final/Carrinho/src/main.c:
  *   - Desvio/freio/manual passam por lib/volante (volante_frente/re/
@@ -48,7 +54,7 @@
 #include "volante.h"
 #include "nrf24.h"
 #include "../../../projeto_final/protocol.h"
-#include "../../../projeto_final/pinmap.h"
+#include "../../../projeto_final/pinmap_carrinho.h"
 
 #define TPM_MOTOR_MOD 3999U
 
@@ -142,6 +148,16 @@ void main(void)
     ret = nrf24_init(&ce, &csn, &irq);
     if (ret < 0) {
         printk("ERRO: rádio falhou = %d. Carrinho continuará sem rádio.\n", ret);
+    }
+
+    /* Teste mínimo de SPI, sem depender do outro board — ver
+     * lib/nrf24/nrf24.h. 0x00/0xFF fixo = MISO provavelmente
+     * desconectado/flutuando (conferir PTC5/PTC6/PTC7 até o módulo). */
+    uint8_t spi_status;
+    if (nrf24_read_status(&spi_status) == 0) {
+        printk("SPI status=0x%02X (0x00 ou 0xFF fixo = MISO suspeito)\n", spi_status);
+    } else {
+        printk("SPI status: falha na leitura\n");
     }
 
     radio_cmd_t cmd = { .auto_mode = 1 }; /* começa em RUN (modo seguro) */
@@ -240,6 +256,11 @@ void main(void)
         if (++loop_cnt % 10 == 0) { /* ~500ms */
             printk("estado=%-12s dist=%dcm outL=%d outR=%d percorrida=%ucm (sem_radio=%d)\n",
                    estado, dist_cm, out_l, out_r, dist_percorrida_cm, sem_radio);
+        }
+        if (sem_radio && loop_cnt % 20 == 0) { /* ~1s, só quando desconectado */
+            if (nrf24_read_status(&spi_status) == 0) {
+                printk("   (SPI status=0x%02X enquanto desconectado)\n", spi_status);
+            }
         }
 
         k_msleep(50);

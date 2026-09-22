@@ -100,6 +100,16 @@ void main(void)
         printk("ERRO: nrf24_init = %d\n", ret);
     }
 
+    /* Teste mínimo de SPI, sem depender do Carrinho — ver
+     * lib/nrf24/nrf24.h. 0x00/0xFF fixo = MISO provavelmente
+     * desconectado/flutuando (conferir PTC5/PTC6/PTC7 até o módulo). */
+    uint8_t spi_status;
+    if (nrf24_read_status(&spi_status) == 0) {
+        printk("SPI status=0x%02X (0x00 ou 0xFF fixo = MISO suspeito)\n", spi_status);
+    } else {
+        printk("SPI status: falha na leitura\n");
+    }
+
     printk("w/a/s/d = mover, x/espaco = STOP, o = RUN, q = ponto morto\n");
     printk("i = mostrar distancia percorrida, c = apagar distancia\n\n");
 
@@ -151,6 +161,13 @@ void main(void)
         } else {
             gpio_pin_set_dt(&led_red, 1);
             gpio_pin_set_dt(&led_green, 0);
+
+            static int red_print_cnt = 0;
+            if (++red_print_cnt % 50 == 0) { /* ~1s, só quando desconectado */
+                if (nrf24_read_status(&spi_status) == 0) {
+                    printk("   (SPI status=0x%02X enquanto desconectado)\n", spi_status);
+                }
+            }
 
             if (handshake) {
                 if (radio_lost_time == 0) {

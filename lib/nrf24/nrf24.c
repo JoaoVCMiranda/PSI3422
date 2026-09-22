@@ -392,6 +392,29 @@ int nrf24_init(const struct gpio_dt_spec *ce,
  * ============================================================
  */
 
+int nrf24_read_status(uint8_t *status)
+{
+	/*
+	 * O nRF24 devolve STATUS como primeiro byte de QUALQUER transação
+	 * SPI, mesmo um NOP puro (datasheet, seção 8.3.1) — não muda
+	 * estado nenhum do chip, é o teste mínimo possível de "o SPI
+	 * chega no módulo?": 0x00 ou 0xFF fixo (não muda entre chamadas)
+	 * é sinal forte de MISO desconectado/flutuando/SPI sem resposta;
+	 * qualquer outro padrão de bits é evidência de que a transação
+	 * está chegando e voltando de verdade.
+	 */
+	uint8_t tx = NRF24_CMD_NOP;
+	uint8_t rx;
+
+	int ret = nrf24_spi_transceive(&tx, &rx, 1);
+	if (ret < 0) {
+		return ret;
+	}
+
+	*status = rx;
+	return 0;
+}
+
 int nrf24_set_auto_ack(bool enable)
 {
 	return nrf24_write_register(NRF24_REG_EN_AA, enable ? BIT(0) : 0);

@@ -68,4 +68,13 @@ int nrf24_receive(uint8_t *data, size_t max_length, k_timeout_t timeout);
  */
 int nrf24_set_auto_ack(bool enable);
 
+/**
+ * Lê o registrador STATUS via um NOP puro (não muda nada no chip) —
+ * teste mínimo de "o SPI está respondendo?", útil sozinho, sem
+ * precisar do outro board. Ver comentário em nrf24.c.
+ *
+ * Retorno: 0 = sucesso (status preenchido), <0 = erro de SPI.
+ */
+int nrf24_read_status(uint8_t *status);
+
 #endif /* NRF24_H */

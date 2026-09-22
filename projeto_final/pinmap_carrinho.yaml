@@ -1,0 +1,240 @@
+# Pinmap do Carrinho FÍSICO (PCB já fabricada) — bifurcado de
+# pinmap.yaml em 2026-09-22. pinmap.yaml (a fonte "atual") passou a
+# valer só pro Controle, que foi fiado à mão DEPOIS do fix de
+# RADIO_SCK/MOSI/MISO (PTC5/PTC6/PTC7); a PCB do Carrinho já existia
+# antes disso e foi roteada em cima do pinmap.yaml de antes do fix —
+# commit 6e70945 (RADIO_SCK/MOSI/MISO = PTD6/PTB9/PTD7).
+#
+# NÃO inclui o revert do fix de canal TPM dos motores
+# (MOTOR_L_ENA_CH/MOTOR_R_ENB_CH): esse bug não é diferença de PCB —
+# é o próprio silício da KL25Z (PTD2 é sempre TPM0_CH2, PTA4 é sempre
+# TPM0_CH1, confirmado em MKL25Z128VLK4-pinctrl.dtsi,
+# independentemente de qual PCB está plugada) — reverter isso
+# reintroduziria um bug real. Só RADIO_SCK/MOSI/MISO voltou pro valor
+# de 6e70945 aqui.
+#
+# ATENÇÃO: PTD6/PTB9/PTD7 não são rota de hardware do SPI0 nem SPI1
+# na KL25Z (só PORTC/PORTA pro SPI0 — ver lib/spi/spi.c) — se a PCB
+# do Carrinho really tem o nRF24 fiado nesses pinos, nrf24_init()
+# (que chama spi_init(SPI_0, ALT_0, ...), fixo em PTC5/PTC6/PTC7) NÃO
+# consegue falar com o rádio da PCB por hardware SPI0. Ou o SPI
+# precisa ser bit-banged nesses 3 pinos especificamente pro Carrinho,
+# ou a fiação física do módulo na PCB precisa ser conferida antes de
+# assumir que é isso — ainda não decidido, ver
+# projeto_final/README.md.
+#
+# NÃO EDITAR os arquivos gerados a partir daqui (pinmap_carrinho.h,
+# Pinmap_carrinho.md, kicad/PSI3422_shield_carrinho.kicad_sym) —
+# editar este YAML e rodar
+# `python3 tools/gen_pinmap.py pinmap_carrinho.yaml` de dentro de
+# projeto_final/.
+#
+# Campos de cada pino:
+#   nome     : usado pra gerar o(s) #define em pinmap.h (MAIÚSCULO)
+#   porta    : letra do PORT da KL25Z (A-E)
+#   pino     : número do pino dentro do port (PTxN)
+#   tipo     : gpio | pwm | adc | doc
+#     gpio -> pinmap.h ganha <nome>_PORT (DEVICE_DT_GET(DT_NODELABEL(gpio<porta>)))
+#             e <nome>_PIN (número) — cobre entrada, saída e entrada com IRQ,
+#             a diferença fica só no `obs`/`direcao`, não no define.
+#     pwm  -> pino de velocidade dos motores, controlado via lib/pwm_z42
+#             (bare-metal, não passa por devicetree): pinmap.h ganha
+#             <nome>_GPIO (GPIO<porta>, macro CMSIS), <nome>_PIN e
+#             <nome>_CH (canal TPM, campo canal_tpm obrigatório).
+#     adc  -> canal ADC0 (joystick): pinmap.h ganha só <nome>_CHANNEL
+#             (campo canal_adc obrigatório) — porta/pino ficam só como
+#             documentação (Pinmap.md/kicad), o código usa o canal.
+#     doc  -> informativo apenas (ex.: SPI/UART fixos internamente por
+#             lib/spi ou pela devicetree) — não gera define nenhum.
+#   direcao  : saida | entrada | entrada_irq | pwm | adc | fixo
+#   boards   : lista com "carrinho" e/ou "controle"
+#   canal_tpm: canal do TPM0 (só tipo=pwm)
+#   canal_adc: canal do ADC0 (só tipo=adc)
+#   obs      : nota curta (motivo da escolha, referência a debug/lib)
+
+pins:
+  # ── Motores (só Carrinho) ────────────────────────────────────────
+  - nome: MOTOR_L_IN1
+    porta: D
+    pino: 0
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho]
+    obs: Ponte H, direção do motor esquerdo (lib/motor)
+  - nome: MOTOR_L_IN2
+    porta: C
+    pino: 9
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho]
+    obs: Ponte H, direção do motor esquerdo (lib/motor)
+  - nome: MOTOR_L_ENA
+    porta: D
+    pino: 2
+    tipo: pwm
+    direcao: pwm
+    canal_tpm: 2
+    boards: [carrinho]
+    obs: TPM0_CH2, velocidade do motor esquerdo, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c)
+  - nome: MOTOR_R_IN1
+    porta: C
+    pino: 8
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho]
+    obs: Ponte H, direção do motor direito (lib/motor)
+  - nome: MOTOR_R_IN2
+    porta: A
+    pino: 5
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho]
+    obs: Ponte H, direção do motor direito (lib/motor)
+  - nome: MOTOR_R_ENB
+    porta: A
+    pino: 4
+    tipo: pwm
+    direcao: pwm
+    canal_tpm: 1
+    boards: [carrinho]
+    obs: TPM0_CH1, velocidade do motor direito, via lib/pwm_z42 (canal corrigido — ver debug/debug_ponte_H_encoder/src/main.c)
+
+  # ── Ultrassom HC-SR04 (só Carrinho) ──────────────────────────────
+  - nome: ULTRASSOM_TRIG
+    porta: D
+    pino: 3
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho]
+    obs: HC-SR04 trigger (lib/ultrassom)
+  - nome: ULTRASSOM_ECHO
+    porta: D
+    pino: 1
+    tipo: gpio
+    direcao: entrada_irq
+    boards: [carrinho]
+    obs: HC-SR04 echo, interrupção de borda (lib/ultrassom)
+
+  # ── Encoders IR HW-201 (só Carrinho) ─────────────────────────────
+  # PORTD de propósito: nesta subfamília KL25Z só PORTA e PORTC/PORTD
+  # têm vetor de interrupção de pino (PORTB/PORTE não, confirmado em
+  # bancada — ver Exp2_PSI3422/debug/README.md e
+  # Exp4_PSI3422/debug/README.md). Polaridade confirmada em bancada
+  # (ESP32, protoboard): HIGH = feixe livre, LOW = feixe interrompido.
+  - nome: ENCODER_L
+    porta: D
+    pino: 1
+    tipo: gpio
+    direcao: entrada_irq
+    boards: [carrinho]
+    obs: IR HW-201 esquerda (lib/encoder)
+  - nome: ENCODER_R
+    porta: A
+    pino: 16
+    tipo: gpio
+    direcao: entrada_irq
+    boards: [carrinho]
+    obs: IR HW-201 direita (lib/encoder)
+
+  # ── Rádio nRF24L01+ (Carrinho) ────────────────────────────────────
+  # Valor de 6e70945 (PTD6/PTB9/PTD7) — como a PCB deste board foi
+  # roteada, por hipótese. NÃO bate com nenhuma rota de hardware do
+  # SPI0/SPI1 desta subfamília (só PORTC/PORTA pro SPI0 — ver
+  # lib/spi/spi.c) — nrf24_init() atual (spi_init(SPI_0, ALT_0, ...),
+  # fixo em PTC5/PTC6/PTC7) não fala com um rádio fiado assim; ver
+  # aviso no topo do arquivo.
+  - nome: RADIO_SCK
+    porta: D
+    pino: 6
+    tipo: doc
+    direcao: fixo
+    boards: [carrinho]
+    obs: valor de 6e70945 — ver aviso no topo do arquivo, spi_init() atual não bate com isso
+  - nome: RADIO_MOSI
+    porta: B
+    pino: 9
+    tipo: doc
+    direcao: fixo
+    boards: [carrinho]
+    obs: idem RADIO_SCK
+  - nome: RADIO_MISO
+    porta: D
+    pino: 7
+    tipo: doc
+    direcao: fixo
+    boards: [carrinho]
+    obs: idem RADIO_SCK
+  - nome: RADIO_CSN
+    porta: B
+    pino: 10
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho, controle]
+    obs: chip-select manual do nRF24 (lib/nrf24)
+  - nome: RADIO_CE
+    porta: E
+    pino: 31
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho, controle]
+    obs: lib/nrf24
+  - nome: RADIO_IRQ
+    porta: B
+    pino: 8
+    tipo: gpio
+    direcao: entrada_irq
+    boards: [carrinho, controle]
+    obs: ativo em LOW (lib/nrf24)
+
+  # ── LEDs de status (Carrinho e Controle) ─────────────────────────
+  - nome: LED_RED
+    porta: B
+    pino: 18
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho, controle]
+    obs: active low
+  - nome: LED_GREEN
+    porta: B
+    pino: 19
+    tipo: gpio
+    direcao: saida
+    boards: [carrinho, controle]
+    obs: active low
+
+  # ── Console UART0 (Controle) ─────────────────────────────────────
+  - nome: CONSOLE_UART0
+    porta: A
+    pino: 1
+    tipo: doc
+    direcao: fixo
+    boards: [controle]
+    obs: PTA1/PTA2 (RX/TX), console fixo via devicetree (zephyr,console) — comandos via script/controle_serial.py
+
+  # ── Joystick (Controle) ──────────────────────────────────────────
+  # AVISO: eixo com defeito confirmado nesta bancada (travado perto de
+  # 3,3V/4095) — ver PENDENCIAS.md do Exp2_PSI3422. joystick_read()
+  # segue desabilitado no firmware; UART continua o caminho principal.
+  - nome: JOYSTICK_X
+    porta: B
+    pino: 0
+    tipo: adc
+    direcao: adc
+    canal_adc: 8
+    boards: [controle]
+    obs: ADC0_SE8 — defeito de hardware conhecido, ver PENDENCIAS.md
+  - nome: JOYSTICK_Y
+    porta: B
+    pino: 1
+    tipo: adc
+    direcao: adc
+    canal_adc: 9
+    boards: [controle]
+    obs: ADC0_SE9
+  - nome: JOYSTICK_BTN
+    porta: B
+    pino: 2
+    tipo: gpio
+    direcao: entrada
+    boards: [controle]
+    obs: botão de freio, pull-up interno, active low

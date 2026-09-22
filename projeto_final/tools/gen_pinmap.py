@@ -93,10 +93,10 @@ def cmsis_gpio_macro(porta):
     return f"GPIO{porta.upper()}"
 
 
-def gen_pinmap_h(pins):
+def gen_pinmap_h(pins, guard="PROJETO_FINAL_PINMAP_H_"):
     lines = [
-        "#ifndef PROJETO_FINAL_PINMAP_H_",
-        "#define PROJETO_FINAL_PINMAP_H_",
+        f"#ifndef {guard}",
+        f"#define {guard}",
         "",
         "/*",
         " * GERADO por tools/gen_pinmap.py a partir de pinmap.yaml — não",
@@ -141,7 +141,7 @@ def gen_pinmap_h(pins):
 
         lines.append("")
 
-    lines.append("#endif /* PROJETO_FINAL_PINMAP_H_ */")
+    lines.append(f"#endif /* {guard} */")
     lines.append("")
     return "\n".join(lines)
 
@@ -237,9 +237,27 @@ def gen_kicad_sym(pins):
 
 
 def main():
-    pins = parse_pinmap_yaml(YAML_PATH)
+    # Uso: gen_pinmap.py [outro.yaml] — sem argumento, gera
+    # pinmap.h/Pinmap.md/kicad/PSI3422_shield.kicad_sym a partir de
+    # pinmap.yaml (comportamento original). Com um YAML alternativo
+    # (ex.: pinmap_carrinho.yaml), deriva os nomes de saída trocando
+    # "pinmap" pelo stem do arquivo (pinmap_carrinho.h,
+    # Pinmap_carrinho.md, kicad/PSI3422_shield_carrinho.kicad_sym) —
+    # pra não sobrescrever o pinmap "atual" ao gerar uma variante
+    # (ver pinmap_carrinho.yaml: PCB já fabricada segue um pinmap
+    # histórico diferente do pinmap.yaml corrente).
+    yaml_arg = sys.argv[1] if len(sys.argv) > 1 else "pinmap.yaml"
+    yaml_path = ROOT / yaml_arg
+    stem = Path(yaml_arg).stem  # "pinmap" ou "pinmap_carrinho"
+
+    if not stem.startswith("pinmap"):
+        print(f"ERRO: nome de arquivo precisa começar com 'pinmap' ({yaml_arg})", file=sys.stderr)
+        return 1
+    sufixo = stem[len("pinmap"):]  # "" ou "_carrinho"
+
+    pins = parse_pinmap_yaml(yaml_path)
     if not pins:
-        print(f"ERRO: nenhum pino lido de {YAML_PATH}", file=sys.stderr)
+        print(f"ERRO: nenhum pino lido de {yaml_path}", file=sys.stderr)
         return 1
 
     for pin in pins:
@@ -248,14 +266,19 @@ def main():
                 print(f"ERRO: pino sem campo obrigatório '{campo}': {pin}", file=sys.stderr)
                 return 1
 
-    (ROOT / "pinmap.h").write_text(gen_pinmap_h(pins), encoding="utf-8")
-    (ROOT / "Pinmap.md").write_text(gen_pinmap_md(pins), encoding="utf-8")
+    h_name = f"pinmap{sufixo}.h"
+    md_name = f"Pinmap{sufixo}.md"
+    sym_name = f"PSI3422_shield{sufixo}.kicad_sym"
+    guard = f"PROJETO_FINAL_PINMAP{sufixo.upper()}_H_"
+
+    (ROOT / h_name).write_text(gen_pinmap_h(pins, guard), encoding="utf-8")
+    (ROOT / md_name).write_text(gen_pinmap_md(pins), encoding="utf-8")
 
     kicad_dir = ROOT / "kicad"
     kicad_dir.mkdir(exist_ok=True)
-    (kicad_dir / "PSI3422_shield.kicad_sym").write_text(gen_kicad_sym(pins), encoding="utf-8")
+    (kicad_dir / sym_name).write_text(gen_kicad_sym(pins), encoding="utf-8")
 
-    print(f"OK: {len(pins)} pinos -> pinmap.h, Pinmap.md, kicad/PSI3422_shield.kicad_sym")
+    print(f"OK: {len(pins)} pinos -> {h_name}, {md_name}, kicad/{sym_name}")
     return 0
 
 
