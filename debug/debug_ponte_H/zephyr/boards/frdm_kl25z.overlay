@@ -1,0 +1,8 @@
+/*
+ * gpioc vem "disabled" por padrão no dtsi do KL25Z; main.c usa PTC5/PTC8
+ * (r_in1/r_in2, direção do motor direito) via DEVICE_DT_GET(DT_NODELABEL(gpioc)),
+ * então precisa estar "okay" ou o linker não gera o device (__device_dts_ord_*).
+ */
+&gpioc {
+	status = "okay";
+};
