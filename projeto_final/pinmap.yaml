@@ -112,22 +112,32 @@ pins:
     obs: IR HW-201 direita (lib/encoder)
 
   # ── Rádio nRF24L01+ (Carrinho e Controle) ────────────────────────
+  # PTD6/PTB9/PTD7 (valores antigos aqui) NUNCA foram opção de SPI0
+  # neste chip — as únicas rotas de hardware do SPI0 na KL25Z são
+  # PORTC (ALT_0) ou PORTA (ALT_1), ver lib/spi/spi.c. nrf24_init()
+  # chama spi_init(SPI_0, ALT_0, ...), que hardcoda PTC5/PTC6/PTC7 via
+  # CMSIS direto (bare-metal, não passa por devicetree/pinmap.h — por
+  # isso tipo=doc, sem define gerado). Corrigido em 2026-09-22 pra
+  # bater com o que o código de verdade usa — se a PCB foi roteada
+  # pelos valores antigos (PTD6/PTB9/PTD7), o SPI do rádio está fisicamente
+  # errado nela; conferir continuidade PTC5/PTC6/PTC7 até o módulo
+  # nRF24 é prioridade de bancada.
   - nome: RADIO_SCK
-    porta: D
-    pino: 6
+    porta: C
+    pino: 5
     tipo: doc
     direcao: fixo
     boards: [carrinho, controle]
     obs: SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h
   - nome: RADIO_MOSI
-    porta: B
-    pino: 9
+    porta: C
+    pino: 6
     tipo: doc
     direcao: fixo
     boards: [carrinho, controle]
     obs: idem RADIO_SCK
   - nome: RADIO_MISO
-    porta: D
+    porta: C
     pino: 7
     tipo: doc
     direcao: fixo

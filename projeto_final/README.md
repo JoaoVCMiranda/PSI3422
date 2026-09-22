@@ -93,6 +93,22 @@ com os três rádios ligados juntos.
 
 ## Pendente (fora desta rodada)
 
+- ~~**RADIO_SCK/MOSI/MISO documentados errado em pinmap.yaml**~~
+  RESOLVIDO (sessão de 22/09/2026): pinmap.yaml dizia PTD6/PTB9/PTD7,
+  mas `nrf24_init()` chama `spi_init(SPI_0, ALT_0, ...)`
+  (`lib/spi/spi.c`), que hardcoda PTC5/PTC6/PTC7 via CMSIS direto —
+  as únicas duas rotas de hardware do SPI0 na KL25Z são PORTC (ALT_0)
+  ou PORTA (ALT_1), então PTD6/PTB9/PTD7 nunca foi uma opção válida
+  (erro de digitação antigo, não uma rota alternativa real).
+  `pinmap.yaml`/`Pinmap.md` corrigidos pra PTC5/PTC6/PTC7 — esses
+  pinos são `tipo: doc` (spi_init() não passa por devicetree, sem
+  define em pinmap.h), então a correção não muda nenhum binário, só a
+  documentação. **Mas se o shield físico foi roteado pelos valores
+  antigos (PTD6/PTB9/PTD7), o SPI do rádio está fisicamente errado na
+  placa** — conferir continuidade PTC5→SCK/PTC6→MOSI/PTC7→MISO do
+  nRF24L01+ é prioridade de bancada, antes de qualquer outro debug de
+  rádio (se for isso, explicaria falha de conexão de forma muito mais
+  direta que qualquer hipótese de timing).
 - ~~**Canais PWM dos motores trocados**~~ RESOLVIDO (sessão de
   22/09/2026): `debug/debug_ponte_H_encoder/src/main.c` já tinha
   descoberto e corrigido isso em bancada ("MOTOR_L_ENA_CH/MOTOR_R_ENB_CH

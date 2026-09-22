@@ -1,0 +1,9 @@
+/*
+ * gpioe (RADIO_CE) vem "disabled" por padrão no dtsi do KL25Z —
+ * precisa estar "okay" ou o linker não gera o device
+ * (__device_dts_ord_*). Idêntico ao overlay de
+ * projeto_final/Controle.
+ */
+&gpioe {
+	status = "okay";
+};

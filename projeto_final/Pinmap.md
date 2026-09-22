@@ -20,9 +20,9 @@ fonte única, que também gera `pinmap.h` e o símbolo KiCad.
 | ULTRASSOM_ECHO | PTD1 | entrada_irq | HC-SR04 echo, interrupção de borda (lib/ultrassom) |
 | ENCODER_L | PTD1 | entrada_irq | IR HW-201 esquerda (lib/encoder) |
 | ENCODER_R | PTA16 | entrada_irq | IR HW-201 direita (lib/encoder) |
-| RADIO_SCK | PTD6 | fixo | SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h |
-| RADIO_MOSI | PTB9 | fixo | idem RADIO_SCK |
-| RADIO_MISO | PTD7 | fixo | idem RADIO_SCK |
+| RADIO_SCK | PTC5 | fixo | SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h |
+| RADIO_MOSI | PTC6 | fixo | idem RADIO_SCK |
+| RADIO_MISO | PTC7 | fixo | idem RADIO_SCK |
 | RADIO_CSN | PTB10 | saida | chip-select manual do nRF24 (lib/nrf24) |
 | RADIO_CE | PTE31 | saida | lib/nrf24 |
 | RADIO_IRQ | PTB8 | entrada_irq | ativo em LOW (lib/nrf24) |
@@ -33,9 +33,9 @@ fonte única, que também gera `pinmap.h` e o símbolo KiCad.
 
 | Sinal | Pino | Tipo/Direção | Observação |
 |---|---|---|---|
-| RADIO_SCK | PTD6 | fixo | SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h |
-| RADIO_MOSI | PTB9 | fixo | idem RADIO_SCK |
-| RADIO_MISO | PTD7 | fixo | idem RADIO_SCK |
+| RADIO_SCK | PTC5 | fixo | SPI0 bare-metal (lib/spi, ALT_0) — fixo dentro de spi_init(), sem define em pinmap.h |
+| RADIO_MOSI | PTC6 | fixo | idem RADIO_SCK |
+| RADIO_MISO | PTC7 | fixo | idem RADIO_SCK |
 | RADIO_CSN | PTB10 | saida | chip-select manual do nRF24 (lib/nrf24) |
 | RADIO_CE | PTE31 | saida | lib/nrf24 |
 | RADIO_IRQ | PTB8 | entrada_irq | ativo em LOW (lib/nrf24) |
