@@ -171,11 +171,31 @@ cmd_parar()  { checa_raspberry; garante paramotor -w
 
 cmd_cam()    { checa_raspberry; checa_display; garante raspcam2 -ocv; ./raspcam2; }
 
-cmd_vid()    { checa_raspberry; checa_display; garante raspvid -ocv
-               local saida=${1:-saida.avi}
-               echo "Licao #1/3: gravando em $saida. Qualquer tecla (na janela) encerra."
-               ./raspvid "$saida"
-               ls -lh "$saida"; }
+# ./aula2.sh vid [-n] [arq.avi]   -n/--sem-tela desliga a pre-visualizacao
+cmd_vid() {
+  checa_raspberry
+  garante raspvid -ocv
+
+  local semtela=0 f
+  for f in "$@"; do
+    case $f in -n|--sem-tela) semtela=1 ;; esac
+  done
+  # So' exige DISPLAY se a tela for mesmo usada.
+  [ "$semtela" = 1 ] || checa_display
+
+  local args=()
+  if [ $# -gt 0 ]; then args=("$@"); else args=(saida.avi); fi
+
+  echo "Licao #1/3: gravando video."
+  [ "$semtela" = 1 ] && echo "Sem tela: a captura roda na velocidade real da camera. Ctrl+C encerra."
+  ./raspvid "${args[@]}"
+
+  local saida=saida.avi
+  for f in "${args[@]}"; do
+    case $f in -*) ;; *) saida=$f ;; esac
+  done
+  [ -f "$saida" ] && ls -lh "$saida"
+}
 
 cmd_server() { checa_raspberry; garante server6b -ocv
                echo "Licao #3/3: aguardando o cliente. No computador rode:"
@@ -198,7 +218,11 @@ aula2.sh - roteiro da Aula 2 (PSI3422 parte 2)    [local: $ONDE]
   ./aula2.sh pwm              pwmroda4 - licao #2/3(b), PWM 90% e 60%
   ./aula2.sh parar            paramotor - PARADA DE EMERGENCIA dos motores
   ./aula2.sh cam              raspcam2 - camera na tela (precisa de ssh -X ou VNC)
-  ./aula2.sh vid [arq.avi]    raspvid  - licao #1/3, grava video (default saida.avi)
+  ./aula2.sh vid [-n] [arq.avi]
+                              raspvid  - licao #1/3, grava video (default saida.avi)
+                              -n/--sem-tela: nao mostra a janela. Use quando
+                              estiver por VNC ou ssh -X: transmitir a imagem
+                              derruba quadros e o video sai acelerado.
   ./aula2.sh server           server6b - licao #3/3, lado Raspberry
 
  Computador:

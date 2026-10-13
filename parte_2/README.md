@@ -188,7 +188,17 @@ instalado (ex.: o OpenCV 3 que vem dentro do Cekeikon) — aí você passa os
 ## 5. Execução
 
     # lição #1/3
-    raspberry$ ./raspvid saida.avi        # qualquer tecla encerra
+    raspberry$ ./raspvid saida.avi        # com tela; qualquer tecla encerra
+    raspberry$ ./raspvid -n saida.avi     # sem tela; Ctrl+C encerra
+
+> **Use `-n` quando estiver por VNC ou `ssh -X`.** Transmitir a janela consome
+> banda, derruba quadros da captura e o vídeo sai acelerado. Sem tela, a
+> captura roda na velocidade real da câmera.
+>
+> O `raspvid` descarta os primeiros 15 quadros (aquecimento da câmera) antes de
+> cronometrar, mede o fps nos 30 seguintes, grava com esse valor e no fim
+> compara o fps real com o medido — avisando se o vídeo tende a sair acelerado
+> ou lento.
 
     # lição #2/3
     raspberry$ ./pwmroda4
