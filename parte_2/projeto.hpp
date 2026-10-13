@@ -1,6 +1,8 @@
 //projeto.hpp - PSI3422 2o sem/2026 - aula 2
 //Classes de comunicacao TCP/IP do projeto.
 //Derivado de server5.c/client5.c (Beej's Guide, adaptado pelo Hae).
+//O retry em EINTR nos lacos de send/recv veio do codigo do Caetano
+//(ver caetano/LEIA-ME.md).
 //
 //Compile sempre com -ocv, pois raspberry.hpp inclui OpenCV:
 //  raspberry$   compila prog -ocv
@@ -60,7 +62,10 @@ public:
     int enviados=0;
     while (enviados<nBytesToSend) {
       ssize_t n=send(fd(), buf+enviados, nBytesToSend-enviados, 0);
-      if (n==-1) erro("Erro: send: "+string(strerror(errno)));
+      if (n==-1) {
+        if (errno==EINTR) continue;  //um sinal interrompeu: tenta de novo
+        erro("Erro: send: "+string(strerror(errno)));
+      }
       enviados += int(n);
     }
   }
@@ -71,7 +76,10 @@ public:
     int recebidos=0;
     while (recebidos<nBytesToReceive) {
       ssize_t n=recv(fd(), buf+recebidos, nBytesToReceive-recebidos, 0);
-      if (n==-1) erro("Erro: recv: "+string(strerror(errno)));
+      if (n==-1) {
+        if (errno==EINTR) continue;  //um sinal interrompeu: tenta de novo
+        erro("Erro: recv: "+string(strerror(errno)));
+      }
       if (n==0)  erro("Erro: conexao fechada pelo outro lado");
       recebidos += int(n);
     }
