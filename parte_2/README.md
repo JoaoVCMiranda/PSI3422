@@ -141,6 +141,22 @@ No **computador**:
 > publicado pelo professor já inclui `<opencv2/opencv.hpp>` na linha 29, então
 > **tudo que inclui `projeto.hpp` precisa de `-ocv`**.
 
+### Qual computador
+
+O computador do projeto é um **Linux Mint com Cekeikon instalado** — é lá que
+vale o `compila` acima, e é o ambiente que a matéria pressupõe (os micros da
+GD-06 também são Mint com Cekeikon). O OpenCV é o **3**, igual ao da Raspi.
+
+O notebook Debian 13 (trixie) **não tem Cekeikon**, e não vale a pena instalar:
+o pacote x86_64 é um binário de 443 MB feito para Mint 18.3 (adaptado até o
+Mint 22) e o Debian trixie é mais novo que isso. Nesse notebook o `aula2.sh`
+cai sozinho num `g++` equivalente, usando o **OpenCV 4** do sistema.
+
+Esse fallback é **conveniência, não substituto**. O OpenCV 4 removeu nomes que
+o `raspberry.hpp` usa; hoje o script contorna `CV_BGR2GRAY` e `CV_GRAY2BGR`,
+mas a aula 3 traz outros (por exemplo `CV_IMWRITE_JPEG_QUALITY`, que virou
+`IMWRITE_JPEG_QUALITY`). Entregue e demonstre sempre no Mint.
+
 ## 5. Execução
 
     # lição #1/3
