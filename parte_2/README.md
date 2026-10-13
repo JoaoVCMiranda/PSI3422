@@ -152,10 +152,16 @@ o pacote x86_64 é um binário de 443 MB feito para Mint 18.3 (adaptado até o
 Mint 22) e o Debian trixie é mais novo que isso. Nesse notebook o `aula2.sh`
 cai sozinho num `g++` equivalente, usando o **OpenCV 4** do sistema.
 
-Esse fallback é **conveniência, não substituto**. O OpenCV 4 removeu nomes que
-o `raspberry.hpp` usa; hoje o script contorna `CV_BGR2GRAY` e `CV_GRAY2BGR`,
-mas a aula 3 traz outros (por exemplo `CV_IMWRITE_JPEG_QUALITY`, que virou
-`IMWRITE_JPEG_QUALITY`). Entregue e demonstre sempre no Mint.
+O OpenCV 4 removeu nomes que o `raspberry.hpp` usa. O `projeto.hpp` traz um
+bloco de compatibilidade no topo, guardado por `#if CV_MAJOR_VERSION >= 4`,
+que cobre `CV_BGR2GRAY`, `CV_GRAY2BGR` e `CV_IMWRITE_JPEG_QUALITY` (este
+usado a partir da aula 3). Com OpenCV 3 o bloco não faz nada.
+
+Ele fica no header, e **não** nas flags de compilação, justamente para valer
+quando você chama o `g++` na mão — basta o `-I` e os `-l`, sem nenhum `-D`.
+
+Ainda assim, entregue e demonstre no Mint com o ambiente da matéria: o
+fallback é conveniência, não substituto.
 
 ### Quando o `compila` falha
 

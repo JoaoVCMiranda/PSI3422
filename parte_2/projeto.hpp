@@ -10,6 +10,28 @@
 #ifndef PROJETO_HPP
 #define PROJETO_HPP
 
+//---------------------------------------------------------------------------
+// Compatibilidade OpenCV 3 <-> OpenCV 4.
+//
+// O raspberry.hpp do professor usa CV_BGR2GRAY e CV_GRAY2BGR, que existiam no
+// OpenCV 2/3 e o OpenCV 4 removeu (viraram cv::COLOR_*). Sem isto, compilar
+// contra um OpenCV 4 da' "CV_BGR2GRAY was not declared in this scope".
+//
+// Fica AQUI, e nao nas flags de compilacao, para valer tambem quando alguem
+// chama o g++ na mao. Precisa vir ANTES do include do raspberry.hpp.
+// No Raspberry e no Cekeikon (OpenCV 3) este bloco nao faz nada.
+//
+// Obs.: CV_32F e CV_8U, tambem usados pelo raspberry.hpp, continuam existindo
+// no OpenCV 4 - nao precisam de tratamento.
+//---------------------------------------------------------------------------
+#include <opencv2/core/version.hpp>
+#if CV_MAJOR_VERSION >= 4
+  #define CV_BGR2GRAY cv::COLOR_BGR2GRAY
+  #define CV_GRAY2BGR cv::COLOR_GRAY2BGR
+  //usado a partir da aula 3, no imencode com qualidade JPEG
+  #define CV_IMWRITE_JPEG_QUALITY cv::IMWRITE_JPEG_QUALITY
+#endif
+
 #include "raspberry.hpp"
 
 #include <unistd.h>

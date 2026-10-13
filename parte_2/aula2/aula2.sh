@@ -67,9 +67,9 @@ constroi_gpp() {
     if [ -n "${OCV_FLAGS:-}" ]; then
       args+=( ${OCV_FLAGS} )
     elif pkg-config --exists opencv4; then
+      # O shim de OpenCV 3<->4 mora no projeto.hpp, nao aqui - assim vale
+      # tambem para quem chama o g++ na mao.
       args+=( $(pkg-config --cflags --libs opencv4) )
-      # raspberry.hpp usa CV_BGR2GRAY/CV_GRAY2BGR, removidos no OpenCV 4
-      args+=(-DCV_BGR2GRAY=cv::COLOR_BGR2GRAY -DCV_GRAY2BGR=cv::COLOR_GRAY2BGR)
     elif pkg-config --exists opencv; then
       args+=( $(pkg-config --cflags --libs opencv) )
     else
