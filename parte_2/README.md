@@ -100,6 +100,27 @@ curto acidental. Use sempre fios com conector fêmea.
 | `aula2/paramotor.cpp` | parada de emergência |
 | `aula2/server6b.cpp` / `client6b.cpp` | **lição #3/3** — teste de `sendBytes`/`receiveBytes` |
 
+## 3.1 Script de uso (`aula2/aula2.sh`)
+
+Atalho para tudo que está nas seções 4 e 5. Detecta sozinho se está rodando no
+Raspberry ou no computador e usa as flags certas.
+
+    ./aula2.sh status           estado do ambiente (câmera, GPIO, IP, binários)
+    ./aula2.sh build            compila o que faz sentido para este local
+    ./aula2.sh blink            blink3 — teste dos 4 GPIO, ANTES de ligar a ponte-H
+    ./aula2.sh pwm              pwmroda4 — lição #2/3(b)
+    ./aula2.sh parar            paramotor — PARADA DE EMERGÊNCIA
+    ./aula2.sh cam              raspcam2 — câmera na tela
+    ./aula2.sh vid [arq.avi]    raspvid — lição #1/3 (default `saida.avi`)
+    ./aula2.sh server           server6b — lição #3/3, lado Raspberry
+    ./aula2.sh client [ip]      client6b — lição #3/3, lado computador
+
+Ordem sugerida: `status` → `build` → `blink` → (fiação) → `pwm` → `vid` → `server`/`client`.
+
+Ele recompila sozinho o que faltar antes de rodar, avisa quando `DISPLAY` está
+vazio (programa com janela precisa de `ssh -X` ou VNC) e, se o Cekeikon não
+estiver instalado, cai num `g++` equivalente — útil no notebook.
+
 ## 4. Compilação
 
 No **Raspberry**:
