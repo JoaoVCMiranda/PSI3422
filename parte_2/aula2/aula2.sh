@@ -18,18 +18,29 @@ fi
 
 # --- o 'compila' do Cekeikon so' existe em shell interativo (vem do .bashrc),
 # --- entao por ssh precisamos carregar o ambiente na mao.
-if ! command -v compila >/dev/null 2>&1; then
-  # O script do Cekeikon faz "export LD_LIBRARY_PATH=...:$LD_LIBRARY_PATH" sem
-  # guarda. Se a variavel estiver unset, o nosso 'set -u' derruba o shell ali
-  # mesmo - por isso relaxamos -u/-e so' durante o source.
+# Cada arquitetura tem o SEU script de ativacao:
+#   x86_64 (Mint)      -> ativa_cekcpu          (e' o que a apostila manda)
+#   armv7l (Raspberry) -> inst-cek5-raspberry.sh
+# Carregar o do Raspberry num PC monta PATH/LD_LIBRARY_PATH errados, e o
+# 'compila' morre com SIGABRT (saida 134).
+if [ "${SEM_CEKEIKON:-0}" != 1 ] && ! command -v compila >/dev/null 2>&1; then
+  case "$(uname -m)" in
+    arm*|aarch64) ATIVA=(~/cekeikon5/bin/inst-cek5-raspberry.sh) ;;
+    *)            ATIVA=(~/cekeikon5/bin/ativa_cekcpu
+                         ~/cekeikon5/bin/inst-cek5-cpu-pycv3.sh) ;;
+  esac
+  # Os scripts do Cekeikon fazem "export LD_LIBRARY_PATH=...:$LD_LIBRARY_PATH"
+  # sem guarda; com 'set -u' isso derruba o shell. Relaxamos so' no source.
   set +u +e
-  for s in ~/cekeikon5/bin/inst-cek5-raspberry.sh ~/cekeikon5/bin/ativa_cekcpu; do
+  for s in "${ATIVA[@]}"; do
     [ -f "$s" ] && { source "$s" >/dev/null 2>&1; break; }
   done
   set -u -e
 fi
 TEM_COMPILA=0
-command -v compila >/dev/null 2>&1 && TEM_COMPILA=1
+if [ "${SEM_CEKEIKON:-0}" != 1 ] && command -v compila >/dev/null 2>&1; then
+  TEM_COMPILA=1
+fi
 
 vermelho() { printf '\033[31m%s\033[0m\n' "$*"; }
 verde()    { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -37,17 +48,12 @@ verde()    { printf '\033[32m%s\033[0m\n' "$*"; }
 # --- compilacao -----------------------------------------------------------
 # Se o Cekeikon estiver instalado usa 'compila' (o que a materia pede).
 # Senao cai num g++ equivalente - util no notebook, que nao tem Cekeikon.
-constroi() {
+# Monta e roda a linha de g++ equivalente a "compila <nome> <flags>".
+# OCV_FLAGS permite passar na mao os -I/-L/-l do OpenCV, para o caso de o
+# pkg-config nao conhecer o OpenCV (ex.: o OpenCV 3 que vem no Cekeikon):
+#   OCV_FLAGS="-I$HOME/cekeikon5/cekeikon/include -L... -lopencv_core ..." ./aula2.sh build
+constroi_gpp() {
   local nome=$1; shift
-  printf '  %-12s ' "$nome"
-
-  if [ "$TEM_COMPILA" = 1 ]; then
-    if compila "$nome" "$@" >/tmp/aula2-build.log 2>&1; then verde OK; else
-      vermelho FALHOU; sed 's/^/     /' /tmp/aula2-build.log | head -12; return 1
-    fi
-    return 0
-  fi
-
   local cv=0 wp=0 f
   for f in "$@"; do
     case $f in
@@ -55,18 +61,46 @@ constroi() {
       -w)   wp=1 ;;
     esac
   done
+
   local args=(-std=c++11 -O2 -o "$nome" "$nome.cpp")
   if [ "$cv" = 1 ]; then
-    local pc=opencv
-    pkg-config --exists opencv4 && pc=opencv4
-    args+=( $(pkg-config --cflags --libs "$pc") )
-    # raspberry.hpp usa CV_BGR2GRAY/CV_GRAY2BGR, removidos no OpenCV 4
-    [ "$pc" = opencv4 ] && args+=(-DCV_BGR2GRAY=cv::COLOR_BGR2GRAY
-                                  -DCV_GRAY2BGR=cv::COLOR_GRAY2BGR)
+    if [ -n "${OCV_FLAGS:-}" ]; then
+      args+=( ${OCV_FLAGS} )
+    elif pkg-config --exists opencv4; then
+      args+=( $(pkg-config --cflags --libs opencv4) )
+      # raspberry.hpp usa CV_BGR2GRAY/CV_GRAY2BGR, removidos no OpenCV 4
+      args+=(-DCV_BGR2GRAY=cv::COLOR_BGR2GRAY -DCV_GRAY2BGR=cv::COLOR_GRAY2BGR)
+    elif pkg-config --exists opencv; then
+      args+=( $(pkg-config --cflags --libs opencv) )
+    else
+      echo "sem OpenCV: nem pkg-config nem OCV_FLAGS" >/tmp/aula2-build.log
+      return 1
+    fi
   fi
   [ "$wp" = 1 ] && args+=(-lwiringPi -lpthread)
 
-  if g++ "${args[@]}" >/tmp/aula2-build.log 2>&1; then verde "OK (g++)"; else
+  g++ "${args[@]}" >/tmp/aula2-build.log 2>&1
+}
+
+constroi() {
+  local nome=$1; shift
+  printf '  %-12s ' "$nome"
+
+  if [ "$TEM_COMPILA" = 1 ]; then
+    local st=0
+    compila "$nome" "$@" >/tmp/aula2-build.log 2>&1 || st=$?
+    if [ "$st" = 0 ]; then verde OK; return 0; fi
+
+    # 134 = SIGABRT: tipicamente ambiente do Cekeikon montado errado.
+    local extra=""
+    [ "$st" = 134 ] && extra=" (SIGABRT - ambiente do Cekeikon)"
+    printf '\033[33mcompila falhou [%s]%s, tentando g++...\033[0m ' "$st" "$extra"
+    [ -s /tmp/aula2-build.log ] && sed 's/^/     /' /tmp/aula2-build.log | head -6
+  fi
+
+  if constroi_gpp "$nome" "$@"; then
+    verde "OK (g++)"
+  else
     vermelho FALHOU; sed 's/^/     /' /tmp/aula2-build.log | head -12; return 1
   fi
 }
@@ -104,6 +138,10 @@ garante() { [ -x "./$1" ] || constroi "$@"; }
 cmd_status() {
   echo "local .............. $ONDE ($(uname -m))"
   echo "compila ............ $(command -v compila || echo 'AUSENTE')"
+  echo "CEK5_PATH .......... ${CEK5_PATH:-'(nao definido)'}"
+  echo "OpenCV (pkg-config)  $(pkg-config --modversion opencv4 2>/dev/null \
+                               || pkg-config --modversion opencv 2>/dev/null \
+                               || echo 'nenhum - use OCV_FLAGS')"
   echo "DISPLAY ............ ${DISPLAY:-'(vazio - sem janela)'}"
   if [ "$ONDE" = raspberry ]; then
     echo "camera ............. $(ls /dev/video0 2>/dev/null || echo 'AUSENTE')"
@@ -167,6 +205,15 @@ aula2.sh - roteiro da Aula 2 (PSI3422 parte 2)    [local: $ONDE]
   ./aula2.sh client [ip]      client6b - licao #3/3 (default $RASPI_PADRAO)
 
 Ordem sugerida: status -> build -> blink -> (fiacao) -> pwm -> vid -> server/client
+
+Variaveis de ambiente:
+  SEM_CEKEIKON=1   ignora o 'compila' e vai direto de g++
+  OCV_FLAGS="..."  passa na mao os -I/-L/-l do OpenCV, quando o pkg-config
+                   nao conhece o OpenCV instalado. Exemplo:
+                   OCV_FLAGS="-I/usr/include/opencv4 -lopencv_core ..." ./aula2.sh build
+
+Se o 'compila' falhar, o script avisa e tenta o g++ sozinho - nao precisa
+fazer nada.
 AJUDA
 }
 

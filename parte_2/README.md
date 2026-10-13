@@ -157,6 +157,28 @@ o `raspberry.hpp` usa; hoje o script contorna `CV_BGR2GRAY` e `CV_GRAY2BGR`,
 mas a aula 3 traz outros (por exemplo `CV_IMWRITE_JPEG_QUALITY`, que virou
 `IMWRITE_JPEG_QUALITY`). Entregue e demonstre sempre no Mint.
 
+### Quando o `compila` falha
+
+O `compila` do Cekeikon é um binário e pode abortar (SIGABRT, saída **134**) se
+o ambiente for ativado pelo script errado. Cada arquitetura tem o seu:
+
+| Máquina | Script de ativação |
+|---|---|
+| Mint / PC x86_64 | `source ~/cekeikon5/bin/ativa_cekcpu` |
+| Raspberry (armv7l) | `source ~/cekeikon5/bin/inst-cek5-raspberry.sh` |
+
+O `aula2.sh` escolhe sozinho pela arquitetura. E se o `compila` falhar mesmo
+assim, ele avisa e **cai no `g++` automaticamente** — não trava o trabalho.
+
+Para forçar ou ajustar o caminho do `g++`:
+
+    SEM_CEKEIKON=1 ./aula2.sh build        # ignora o compila
+    OCV_FLAGS="-I/usr/include/opencv4 -lopencv_core ..." ./aula2.sh build
+
+`OCV_FLAGS` existe para o caso de o `pkg-config` não conhecer o OpenCV
+instalado (ex.: o OpenCV 3 que vem dentro do Cekeikon) — aí você passa os
+`-I`/`-L`/`-l` na mão.
+
 ## 5. Execução
 
     # lição #1/3
