@@ -1,0 +1,14 @@
+# Executaveis gerados pelo 'compila' do Cekeikon (nao tem extensao).
+# Sao binarios ARM no Raspberry e x86 no computador - nunca versionar.
+aula2/blink3
+aula2/paramotor
+aula2/pwmroda4
+aula2/raspcam2
+aula2/raspvid
+aula2/server6b
+aula2/client6b
+
+# Videos gravados pelo raspvid
+*.avi
+
+*.o
