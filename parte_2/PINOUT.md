@@ -25,6 +25,18 @@ você conta no conector.
 O terra comum é obrigatório: Raspberry e ponte-H têm fontes independentes e
 precisam compartilhar a referência de 0 V, senão o nível lógico não é visto.
 
+**Dentro de cada par, a ordem é escolha nossa.** A apostila (p. 13) só diz
+"conecte os 4 fios GPIO (físicos 11, 12, 13 e 15) às 4 entradas (conectores 8,
+9, 10 e 11)" — correspondência de conjunto. O agrupamento é forçado (wPi 0 e 1
+são o motor A, logo vão em 8 e 9), mas qual dos dois é o 8 e qual é o 9 não
+está especificado. A tabela acima fixa a ordem natural.
+
+Se um par estiver invertido, aquele motor simplesmente gira ao contrário — não
+é defeito de fiação. Conserto: trocar os dois fios, ou trocar os dois
+argumentos no `softPwmWrite`. A própria apostila deixa o acerto fino para
+depois (Fase 2: "calibre as potências dos dois motores de forma que o carrinho
+ande para frente em linha reta").
+
 Trecho real do `gpio readall` (lado ímpar do conector):
 
 ```
