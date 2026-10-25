@@ -1,5 +1,7 @@
-//projeto.hpp - PSI3422 2o sem/2026 - aula 2
+//projeto.hpp - PSI3422 2o sem/2026 - aulas 2 e 3
 //Classes de comunicacao TCP/IP do projeto.
+//Aula 3: confirmacao no sendVb/receiveVb, testaVb, sendImg/receiveImg
+//(sem compressao) e sendImgComp/receiveImgComp (JPEG).
 //Derivado de server5.c/client5.c (Beej's Guide, adaptado pelo Hae).
 //O retry em EINTR nos lacos de send/recv veio do codigo do Caetano
 //(ver caetano/LEIA-ME.md).
@@ -28,7 +30,8 @@
 #if CV_MAJOR_VERSION >= 4
   #define CV_BGR2GRAY cv::COLOR_BGR2GRAY
   #define CV_GRAY2BGR cv::COLOR_GRAY2BGR
-  //usado a partir da aula 3, no imencode com qualidade JPEG
+  //o projeto usa cv::IMWRITE_JPEG_QUALITY (existe no 3 e no 4); isto e'
+  //so' para quem copiar codigo antigo que use o nome em C
   #define CV_IMWRITE_JPEG_QUALITY cv::IMWRITE_JPEG_QUALITY
 #endif
 
@@ -51,6 +54,16 @@ bool testaBytes(BYTE* buf, BYTE b, int n) {
   bool igual=true;
   for (int i=0; i<n; i++)
     if (buf[i]!=b) { igual=false; break; }
+  return igual;
+}
+
+//---------------------------------------------------------------------------
+// testaVb: testa se todos os bytes de vb possuem valor b (aula 3)
+//---------------------------------------------------------------------------
+bool testaVb(const vector<BYTE> vb, BYTE b) {
+  bool igual=true;
+  for (unsigned i=0; i<vb.size(); i++)
+    if (vb[i]!=b) { igual=false; break; }
   return igual;
 }
 
@@ -80,10 +93,13 @@ public:
 
   // Envia exatamente nBytesToSend bytes.
   // send() pode enviar MENOS bytes do que o pedido - por isso o laco.
+  // MSG_NOSIGNAL: se o outro lado caiu, send() devolve EPIPE em vez de matar
+  // o processo com SIGPIPE. Assim erro() roda e os handlers de atexit (ex.:
+  // desligar os motores no servidor2) tambem.
   void sendBytes(int nBytesToSend, const BYTE *buf) {
     int enviados=0;
     while (enviados<nBytesToSend) {
-      ssize_t n=send(fd(), buf+enviados, nBytesToSend-enviados, 0);
+      ssize_t n=send(fd(), buf+enviados, nBytesToSend-enviados, MSG_NOSIGNAL);
       if (n==-1) {
         if (errno==EINTR) continue;  //um sinal interrompeu: tenta de novo
         erro("Erro: send: "+string(strerror(errno)));
@@ -122,17 +138,59 @@ public:
     m=ntohl(rede);
   }
 
-  // vector<BYTE> = cabecalho (tamanho) + dados, enviados em dois passos.
+  // vector<BYTE> = cabecalho (tamanho) + dados, enviados em tres passos:
+  //  1) sender envia o tamanho t; receiver recebe t e aloca t bytes
+  //  2) receiver confirma, devolvendo t; sender confere a confirmacao
+  //  3) sender envia os t bytes; receiver os recebe em vb.data()
   void sendVb(const vector<BYTE>& vb) {
-    sendUint(uint32_t(vb.size()));
-    sendBytes(int(vb.size()), vb.data());
+    uint32_t t=uint32_t(vb.size());
+    sendUint(t);
+    uint32_t conf;
+    receiveUint(conf);
+    if (conf!=t) erro("Erro: sendVb: confirmacao "+to_string(conf)+
+                      " diferente do tamanho "+to_string(t));
+    sendBytes(int(t), vb.data());
   }
 
   void receiveVb(vector<BYTE>& vb) {
     uint32_t t;
     receiveUint(t);
     vb.resize(t);
+    sendUint(t);                 //confirmacao: "recebi t, pode mandar"
     receiveBytes(int(t), vb.data());
+  }
+
+  // Imagem colorida SEM compressao: linhas, colunas e depois os pixels.
+  // Mat_ vindo da camera e' continuo; clone() garante isso para um ROI.
+  void sendImg(const Mat_<COR>& img) {
+    Mat_<COR> c = img.isContinuous() ? img : Mat_<COR>(img.clone());
+    sendUint(uint32_t(c.rows));
+    sendUint(uint32_t(c.cols));
+    sendBytes(int(c.total()*c.elemSize()), c.data);
+  }
+
+  void receiveImg(Mat_<COR>& img) {
+    uint32_t l, c;
+    receiveUint(l);
+    receiveUint(c);
+    img.create(int(l), int(c));  //so' realoca se o tamanho mudou
+    receiveBytes(int(img.total()*img.elemSize()), img.data);
+  }
+
+  // Imagem colorida COM compressao JPEG. imencode grava "o arquivo .jpg"
+  // num vector<BYTE> em vez do disco; imdecode faz o caminho inverso.
+  void sendImgComp(const Mat_<COR>& img, int qualidade=80) {
+    vector<BYTE> vb;
+    vector<int> param{IMWRITE_JPEG_QUALITY, qualidade};
+    if (!imencode(".jpg", img, vb, param)) erro("Erro: imencode");
+    sendVb(vb);
+  }
+
+  void receiveImgComp(Mat_<COR>& img) {
+    vector<BYTE> vb;
+    receiveVb(vb);
+    img = imdecode(vb, IMREAD_COLOR);
+    if (img.empty()) erro("Erro: imdecode: JPEG invalido");
   }
 };
 
@@ -176,7 +234,7 @@ public:
   }
 
   ~SERVER() {
-    if (new_fd!=-1) close(new_fd);
+    if (new_fd!=-1) { close(new_fd); printf("server: fechei conexao.\n"); }
     if (sockfd!=-1) close(sockfd);
   }
 
