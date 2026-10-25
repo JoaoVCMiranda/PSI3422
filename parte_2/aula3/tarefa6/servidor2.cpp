@@ -12,7 +12,7 @@
 //reta com "8" e com "2", e depois copie os valores para as constantes
 //abaixo. Ex.: se puxa para a direita indo para frente, a roda esquerda
 //esta' mais forte: diminua frenteEsq (ou aumente frenteDir).
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 #include <wiringPi.h>
 #include <softPwm.h>
 #include <csignal>

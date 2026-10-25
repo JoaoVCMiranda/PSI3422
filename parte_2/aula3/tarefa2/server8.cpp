@@ -1,7 +1,7 @@
 //server8.cpp - Raspberry - Tarefa 2 da aula 3
 //testa sendVb e receiveVb
 //raspberry$ compila server8 -ocv
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(void) {
   SERVER server;

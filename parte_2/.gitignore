@@ -12,15 +12,6 @@ aula2/client6b
 *.avi
 
 *.o
-aula3/server6c
-aula3/client6c
-aula3/server8
-aula3/client8
-aula3/camserver1
-aula3/camclient1
-aula3/camserver2
-aula3/camclient2
-aula3/servidor1
-aula3/cliente1
-aula3/servidor2
-aula3/cliente2
+# Aula 3: executaveis nas pastas das tarefas (tudo que nao for .cpp)
+aula3/tarefa*/*
+!aula3/tarefa*/*.cpp

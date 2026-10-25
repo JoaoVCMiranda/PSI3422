@@ -7,7 +7,7 @@
 //a mensagem recebida (prova de que o comando chegou), compacta e envia.
 //raspberry$ compila servidor1 -ocv
 //raspberry$ servidor1
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(void) {
   VideoCapture w(0);

@@ -1,15 +1,15 @@
 # Aula 3 parte 2 — comunicação, câmera via rede e controle remoto
 
-| Tarefa | Raspberry | Computador | O que demonstra |
+| Pasta | Raspberry | Computador | O que demonstra |
 |---|---|---|---|
-| 1 | `server6c` | `client6c` | `sendUint`/`receiveUint` com `htonl`/`ntohl` |
-| 2 | `server8` | `client8` | `sendVb`/`receiveVb` (tamanho → confirmação → dados) |
-| 3 | `camserver1` | `camclient1` | quadros 480×640 **sem** compressão |
-| 4 | `camserver2` | `camclient2` | quadros 480×640 com **JPEG** (`sendImgComp`) |
-| 5 | `servidor1` | `cliente1` | teclado virtual, 240×320, comando escrito na imagem, gravação t/c |
-| 6 | `servidor2` | `cliente2` | igual à 5, mas move os motores (sem texto na imagem) |
+| [`tarefa1`](tarefa1/) | `server6c` | `client6c` | `sendUint`/`receiveUint` com `htonl`/`ntohl` |
+| [`tarefa2`](tarefa2/) | `server8` | `client8` | `sendVb`/`receiveVb` (tamanho → confirmação → dados) |
+| [`tarefa3`](tarefa3/) | `camserver1` | `camclient1` | quadros 480×640 **sem** compressão |
+| [`tarefa4`](tarefa4/) | `camserver2` | `camclient2` | quadros 480×640 com **JPEG** (`sendImgComp`) |
+| [`tarefa5`](tarefa5/) | `servidor1` | `cliente1` | teclado virtual, 240×320, comando escrito na imagem, gravação t/c |
+| [`tarefa6`](tarefa6/) | `servidor2` | `cliente2` | igual à 5, mas move os motores (sem texto na imagem) |
 
-`teclado.hpp` é compartilhado por `cliente1` e `cliente2` (teclado virtual,
+`teclado.hpp`, na raiz de `aula3/`, é compartilhado por `cliente1` e `cliente2` (teclado virtual,
 gravador de vídeo e leitura dos argumentos).
 
 ## Onde está cada método pedido
@@ -36,32 +36,32 @@ desliga os motores (ver abaixo).
 
     ./aula3.sh build          # compila o que faz sentido para este local
 
-ou, na mão:
+ou, na mão (de dentro de `aula3/`; cada programa compila na pasta da sua tarefa):
 
-    raspberry$  compila server6c -ocv
-    raspberry$  compila server8 -ocv
-    raspberry$  compila camserver1 -ocv
-    raspberry$  compila camserver2 -ocv
-    raspberry$  compila servidor1 -ocv
-    raspberry$  compila servidor2 -ocv -w
+    raspberry$  (cd tarefa1 && compila server6c -ocv)
+    raspberry$  (cd tarefa2 && compila server8 -ocv)
+    raspberry$  (cd tarefa3 && compila camserver1 -ocv)
+    raspberry$  (cd tarefa4 && compila camserver2 -ocv)
+    raspberry$  (cd tarefa5 && compila servidor1 -ocv)
+    raspberry$  (cd tarefa6 && compila servidor2 -ocv -w)
 
-    computador$ compila client6c -ocv -v3
-    computador$ compila client8 -ocv -v3
-    computador$ compila camclient1 -ocv -v3
-    computador$ compila camclient2 -ocv -v3
-    computador$ compila cliente1 -ocv -v3
-    computador$ compila cliente2 -ocv -v3
+    computador$ (cd tarefa1 && compila client6c -ocv -v3)
+    computador$ (cd tarefa2 && compila client8 -ocv -v3)
+    computador$ (cd tarefa3 && compila camclient1 -ocv -v3)
+    computador$ (cd tarefa4 && compila camclient2 -ocv -v3)
+    computador$ (cd tarefa5 && compila cliente1 -ocv -v3)
+    computador$ (cd tarefa6 && compila cliente2 -ocv -v3)
 
 ## Rodar
 
 Sempre o servidor primeiro. Troque o IP pelo do Raspberry.
 
-    raspberry$ ./server6c             computador$ ./client6c 192.168.15.44
-    raspberry$ ./server8              computador$ ./client8 192.168.15.44
-    raspberry$ ./camserver1           computador$ ./camclient1 192.168.15.44
-    raspberry$ ./camserver2           computador$ ./camclient2 192.168.15.44
-    raspberry$ ./servidor1            computador$ ./cliente1 192.168.15.44 [video.avi] [t/c]
-    raspberry$ ./servidor2            computador$ ./cliente2 192.168.15.44 [video.avi] [t/c]
+    raspberry$ tarefa1/server6c             computador$ tarefa1/client6c 192.168.15.44
+    raspberry$ tarefa2/server8              computador$ tarefa2/client8 192.168.15.44
+    raspberry$ tarefa3/camserver1           computador$ tarefa3/camclient1 192.168.15.44
+    raspberry$ tarefa4/camserver2           computador$ tarefa4/camclient2 192.168.15.44
+    raspberry$ tarefa5/servidor1            computador$ tarefa5/cliente1 192.168.15.44 [video.avi] [t/c]
+    raspberry$ tarefa6/servidor2            computador$ tarefa6/cliente2 192.168.15.44 [video.avi] [t/c]
 
 - **ESC** com a janela do computador em foco termina os dois programas
   (tarefas 3 a 6).
@@ -87,7 +87,7 @@ Nas tarefas 3 e 4 o cliente só manda `0` ou `s`.
 
 ## Tarefa 6 — motores e calibração
 
-Mapeamento e potências estão no topo de [`servidor2.cpp`](servidor2.cpp):
+Mapeamento e potências estão no topo de [`tarefa6/servidor2.cpp`](tarefa6/servidor2.cpp):
 
 | Botão | Esquerda | Direita |
 |---|---|---|
@@ -102,17 +102,17 @@ Mapeamento e potências estão no topo de [`servidor2.cpp`](servidor2.cpp):
 
 **Calibração, nesta ordem:**
 
-1. `./servidor2` e segure **8**. Se alguma roda girar para trás, troque os
+1. `tarefa6/servidor2` e segure **8**. Se alguma roda girar para trás, troque os
    pinos daquela roda (`ESQ_FRENTE`/`ESQ_TRAS` ou `DIR_FRENTE`/`DIR_TRAS`).
    Se o carrinho girar para o lado errado no **4**, troque esquerda ↔ direita.
 2. Linha reta: passe as potências como argumento, sem recompilar:
 
-       raspberry$ ./servidor2 frenteEsq frenteDir reEsq reDir
-       raspberry$ ./servidor2 80 74 80 76
+       raspberry$ tarefa6/servidor2 frenteEsq frenteDir reEsq reDir
+       raspberry$ tarefa6/servidor2 80 74 80 76
 
    Se puxa para a direita indo para frente, a roda esquerda está mais forte:
    diminua `frenteEsq` (ou aumente `frenteDir`). Repita com o **2** para a ré.
-3. Copie os valores finais para as constantes do `servidor2.cpp`.
+3. Copie os valores finais para as constantes do `tarefa6/servidor2.cpp`.
 
 **Segurança:** os motores são desligados quando o programa termina por
 qualquer motivo — `s`, queda da conexão (`erro()` → `atexit`), Ctrl+C ou

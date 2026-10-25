@@ -1,7 +1,7 @@
 //client8.cpp - computador - Tarefa 2 da aula 3
 //testa sendVb e receiveVb
 //computador$ compila client8 -ocv -v3
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(int argc, char *argv[]) {
   if (argc!=2) erro("client8 servidorIpAddr\n");

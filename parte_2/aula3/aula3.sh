@@ -50,24 +50,30 @@ constroi_gpp() {
 }
 
 constroi() {
-  local nome=$1; shift
-  printf '  %-12s ' "$nome"
-  if [ "$TEM_COMPILA" = 1 ]; then
-    if compila "$nome" "$@" >/tmp/aula3-build.log 2>&1; then verde OK; return 0; fi
-    printf '\033[33mcompila falhou, tentando g++...\033[0m '
-  fi
-  if constroi_gpp "$nome" "$@"; then verde "OK (g++)"
-  else vermelho FALHOU; sed 's/^/     /' /tmp/aula3-build.log | head -12; return 1
-  fi
+  # $1 = tarefaN/programa: compila dentro da pasta da tarefa
+  local dir=${1%/*} nome=${1##*/}; shift
+  printf '  %-20s ' "$dir/$nome"
+  (
+    cd "$dir"
+    if [ "$TEM_COMPILA" = 1 ]; then
+      if compila "$nome" "$@" >/tmp/aula3-build.log 2>&1; then verde OK; exit 0; fi
+      printf '\033[33mcompila falhou, tentando g++...\033[0m '
+    fi
+    if constroi_gpp "$nome" "$@"; then verde "OK (g++)"
+    else vermelho FALHOU; sed 's/^/     /' /tmp/aula3-build.log | head -12; exit 1
+    fi
+  )
 }
 
 cmd_build() {
   echo "Compilando em: $ONDE"
   if [ "$ONDE" = raspberry ]; then
-    for p in server6c server8 camserver1 camserver2 servidor1; do constroi $p -ocv; done
-    constroi servidor2 -ocv -w
+    for p in tarefa1/server6c tarefa2/server8 tarefa3/camserver1 \
+             tarefa4/camserver2 tarefa5/servidor1; do constroi $p -ocv; done
+    constroi tarefa6/servidor2 -ocv -w
   else
-    for p in client6c client8 camclient1 camclient2 cliente1 cliente2; do constroi $p -ocv -v3; done
+    for p in tarefa1/client6c tarefa2/client8 tarefa3/camclient1 \
+             tarefa4/camclient2 tarefa5/cliente1 tarefa6/cliente2; do constroi $p -ocv -v3; done
   fi
 }
 
@@ -79,12 +85,12 @@ aula3.sh - Aula 3 (PSI3422 parte 2)    [local: $ONDE]
   ./aula3.sh build     compila os programas deste local
 
 Depois, servidor no Raspberry e cliente no computador (ver README.md):
-  tarefa 1  ./server6c    | ./client6c   <ip>
-  tarefa 2  ./server8     | ./client8    <ip>
-  tarefa 3  ./camserver1  | ./camclient1 <ip>
-  tarefa 4  ./camserver2  | ./camclient2 <ip>
-  tarefa 5  ./servidor1   | ./cliente1   <ip> [video.avi] [t/c]
-  tarefa 6  ./servidor2   | ./cliente2   <ip> [video.avi] [t/c]
+  tarefa1/server6c    | tarefa1/client6c   <ip>
+  tarefa2/server8     | tarefa2/client8    <ip>
+  tarefa3/camserver1  | tarefa3/camclient1 <ip>
+  tarefa4/camserver2  | tarefa4/camclient2 <ip>
+  tarefa5/servidor1   | tarefa5/cliente1   <ip> [video.avi] [t/c]
+  tarefa6/servidor2   | tarefa6/cliente2   <ip> [video.avi] [t/c]
 AJUDA
   ;;
 esac

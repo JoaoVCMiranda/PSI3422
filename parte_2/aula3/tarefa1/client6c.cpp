@@ -1,7 +1,7 @@
 //client6c.cpp - computador - Tarefa 1 da aula 3
 //testa sendUint e receiveUint (htonl/ntohl ficam em DEVICE, no projeto.hpp)
 //computador$ compila client6c -ocv -v3
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(int argc, char *argv[]) {
   if (argc!=2) erro("client6c servidorIpAddr\n");

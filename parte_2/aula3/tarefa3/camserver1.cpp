@@ -4,7 +4,7 @@
 //'s' = termina (o usuario apertou ESC no computador).
 //raspberry$ compila camserver1 -ocv
 //raspberry$ camserver1
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(void) {
   VideoCapture w(0);

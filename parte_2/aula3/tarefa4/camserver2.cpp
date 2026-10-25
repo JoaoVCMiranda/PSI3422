@@ -3,7 +3,7 @@
 //(sendImgComp do projeto.hpp).
 //raspberry$ compila camserver2 -ocv
 //raspberry$ camserver2
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(void) {
   VideoCapture w(0);

@@ -3,7 +3,7 @@
 //ESC (com a janela em foco) termina os dois programas.
 //computador$ compila camclient1 -ocv -v3
 //computador$ camclient1 192.168.0.110
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(int argc, char *argv[]) {
   if (argc!=2) erro("camclient1 servidorIpAddr\n");

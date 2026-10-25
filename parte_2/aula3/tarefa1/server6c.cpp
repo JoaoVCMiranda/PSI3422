@@ -1,7 +1,7 @@
 //server6c.cpp - Raspberry - Tarefa 1 da aula 3
 //testa sendUint e receiveUint (htonl/ntohl ficam em DEVICE, no projeto.hpp)
 //raspberry$ compila server6c -ocv
-#include "../projeto.hpp"
+#include "../../projeto.hpp"
 
 int main(void) {
   SERVER server;

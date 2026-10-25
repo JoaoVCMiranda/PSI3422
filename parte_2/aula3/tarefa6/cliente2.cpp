@@ -9,7 +9,7 @@
 //computador$ cliente2 192.168.0.110 [videosaida.avi] [t/c]
 //  t = grava a tela inteira, com o teclado (default)
 //  c = grava so' a imagem da camera
-#include "teclado.hpp"
+#include "../teclado.hpp"
 
 int main(int argc, char *argv[]) {
   ARGCLIENTE arg(argc,argv,"cliente2");
