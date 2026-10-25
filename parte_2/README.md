@@ -99,6 +99,7 @@ curto acidental. Use sempre fios com conector fêmea.
 | `aula2/pwmroda4.cpp` | **lição #2/3 (b)** — softPwm a 90% e 60% |
 | `aula2/paramotor.cpp` | parada de emergência |
 | `aula2/server6b.cpp` / `client6b.cpp` | **lição #3/3** — teste de `sendBytes`/`receiveBytes` |
+| `aula3/` | **aula 3** — `sendUint`/`sendVb`, câmera pela rede (crua e JPEG), teclado virtual e controle dos motores. Ver [`aula3/README.md`](aula3/README.md) |
 
 ## 3.1 Script de uso (`aula2/aula2.sh`)
 
