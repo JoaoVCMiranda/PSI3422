@@ -50,15 +50,17 @@ void motores(double esq, double dir) {
 }
 
 void comando(BYTE cmd) {
+  //Diagonais (7, 9, 1, 3) acertadas no carrinho real em 26/10/2026: com a
+  //roda "de dentro" mais lenta, as curvas saiam para o lado oposto.
   switch (cmd) {
-    case '7': motores(CURVA, 1.0);     break; //esquerda
+    case '7': motores(1.0, CURVA);     break; //esquerda
     case '8': motores(1.0, 1.0);       break; //frente
-    case '9': motores(1.0, CURVA);     break; //direita
+    case '9': motores(CURVA, 1.0);     break; //direita
     case '4': motores(-GIRO, GIRO);    break; //esquerda acentuada (gira no eixo)
     case '6': motores(GIRO, -GIRO);    break; //direita acentuada (gira no eixo)
-    case '1': motores(-CURVA, -1.0);   break; //re a esquerda
+    case '1': motores(-1.0, -CURVA);   break; //re a esquerda
     case '2': motores(-1.0, -1.0);     break; //re
-    case '3': motores(-1.0, -CURVA);   break; //re a direita
+    case '3': motores(-CURVA, -1.0);   break; //re a direita
     default:  motores(0, 0);           break; //'0', '5' ou desconhecido: para
   }
 }

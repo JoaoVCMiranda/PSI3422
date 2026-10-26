@@ -97,9 +97,9 @@ Mapeamento e potências estão no topo de [`tarefa6/servidor2.cpp`](tarefa6/serv
 |---|---|---|
 | 8 frente | +100% | +100% |
 | 2 ré | −100% | −100% |
-| 7 / 9 curva | 35% / 100% | 100% / 35% |
+| 7 / 9 curva | 100% / 35% | 35% / 100% |
 | 4 / 6 giro no eixo | −70% / +70% | +70% / −70% |
-| 1 / 3 ré em curva | −35% / −100% | −100% / −35% |
+| 1 / 3 ré em curva | −100% / −35% | −35% / −100% |
 | 0, 5 | para | para |
 
 (100% = potência calibrada daquela roda naquele sentido.)
