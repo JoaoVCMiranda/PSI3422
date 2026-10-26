@@ -2,7 +2,8 @@
 //Recebe os quadros do servidor1, gruda o teclado virtual a esquerda,
 //mostra na janela e (opcionalmente) grava em video.
 //Envia ao servidor 1 byte por quadro: 's' (ESC), '0' (nenhum botao) ou
-//'1'..'9' (botao virtual apertado com o mouse).
+//'1'..'9' (botao virtual apertado com o mouse, ou tecla do PC - ver
+//teclado.hpp: numeros, setas, qwe/asd/zxc).
 //computador$ compila cliente1 -ocv -v3
 //computador$ cliente1 192.168.0.110 [videosaida.avi] [t/c]
 //  t = grava a tela inteira, com o teclado (default)
@@ -28,8 +29,8 @@ int main(int argc, char *argv[]) {
     imshow("cliente1",tela);
     if (gravador) gravador->grava(arg.modo=='c' ? img : tela);
 
-    int ch=(signed char)(waitKey(1));
-    cmd = (ch==27) ? 's' : teclado.codigo();
+    bool esc=teclado.leTeclas();     //teclado fisico; true = ESC
+    cmd = esc ? 's' : teclado.codigo();
     client.sendBytes(1,&cmd);
     if (cmd=='s') break;
   }
