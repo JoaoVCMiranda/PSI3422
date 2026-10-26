@@ -67,6 +67,10 @@ Sempre o servidor primeiro. Troque o IP pelo do Raspberry.
   (tarefas 3 a 6).
 - Teclado virtual: **segure** o botão esquerdo do mouse sobre um botão; ao
   soltar, volta para "0" (nenhum botão). Dá para arrastar de um botão a outro.
+- Teclado do PC (com a janela em foco), também "segure para andar":
+  números `1`–`9` (linha de cima ou numérico), setas (↑ 8, ↓ 2, ← 4, → 6),
+  `q w e / a s d / z x c` = `7 8 9 / 4 5 6 / 1 2 3`, espaço = para.
+  O carrinho para ~0,3 s depois de soltar a tecla; um toque rápido anda ~0,7 s.
 - Vídeo: `t` (default) grava a janela inteira, com o teclado (560×240);
   `c` grava só a câmera (320×240). Sem nome de vídeo, não grava. O fps do
   vídeo é **medido** nos primeiros 20 quadros (depende da rede), para o vídeo
