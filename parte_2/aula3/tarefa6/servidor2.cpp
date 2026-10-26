@@ -22,11 +22,13 @@
 // 0,1 e motor B = pinos 2,3. Qual pino de cada par e' "frente" depende de
 // como os fios do motor foram ligados: se "8" fizer uma roda girar para
 // tras, troque os dois pinos daquela roda aqui.
-// Conferido no nosso carrinho em 26/10/2026: com 0 e 2 como "frente" as
-// duas rodas andavam para tras, entao frente = 1 e 3.
+// Conferido no nosso carrinho em 26/10/2026 (frente = lado da camera): o
+// motor A (pinos 0,1) e' a roda DIREITA e o B (2,3) a ESQUERDA, com os
+// pinos pares como "frente". Bate com o pwmroda4: 0 e 3 ligados giram o
+// carrinho no eixo.
 //---------------------------------------------------------------------------
-const int ESQ_FRENTE=1, ESQ_TRAS=0;   //motor A = roda esquerda
-const int DIR_FRENTE=3, DIR_TRAS=2;   //motor B = roda direita
+const int ESQ_FRENTE=2, ESQ_TRAS=3;   //motor B = roda esquerda
+const int DIR_FRENTE=0, DIR_TRAS=1;   //motor A = roda direita
 
 //Potencias calibradas (%). Valores iniciais - calibre no carrinho real.
 int frenteEsq=80, frenteDir=80;
@@ -50,17 +52,15 @@ void motores(double esq, double dir) {
 }
 
 void comando(BYTE cmd) {
-  //Diagonais (7, 9, 1, 3) acertadas no carrinho real em 26/10/2026: com a
-  //roda "de dentro" mais lenta, as curvas saiam para o lado oposto.
   switch (cmd) {
-    case '7': motores(1.0, CURVA);     break; //esquerda
+    case '7': motores(CURVA, 1.0);     break; //esquerda
     case '8': motores(1.0, 1.0);       break; //frente
-    case '9': motores(CURVA, 1.0);     break; //direita
+    case '9': motores(1.0, CURVA);     break; //direita
     case '4': motores(-GIRO, GIRO);    break; //esquerda acentuada (gira no eixo)
     case '6': motores(GIRO, -GIRO);    break; //direita acentuada (gira no eixo)
-    case '1': motores(-1.0, -CURVA);   break; //re a esquerda
+    case '1': motores(-CURVA, -1.0);   break; //re a esquerda
     case '2': motores(-1.0, -1.0);     break; //re
-    case '3': motores(-CURVA, -1.0);   break; //re a direita
+    case '3': motores(-1.0, -CURVA);   break; //re a direita
     default:  motores(0, 0);           break; //'0', '5' ou desconhecido: para
   }
 }
