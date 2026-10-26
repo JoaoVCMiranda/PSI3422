@@ -22,9 +22,11 @@
 // 0,1 e motor B = pinos 2,3. Qual pino de cada par e' "frente" depende de
 // como os fios do motor foram ligados: se "8" fizer uma roda girar para
 // tras, troque os dois pinos daquela roda aqui.
+// Conferido no nosso carrinho em 26/10/2026: com 0 e 2 como "frente" as
+// duas rodas andavam para tras, entao frente = 1 e 3.
 //---------------------------------------------------------------------------
-const int ESQ_FRENTE=0, ESQ_TRAS=1;   //motor A = roda esquerda
-const int DIR_FRENTE=2, DIR_TRAS=3;   //motor B = roda direita
+const int ESQ_FRENTE=1, ESQ_TRAS=0;   //motor A = roda esquerda
+const int DIR_FRENTE=3, DIR_TRAS=2;   //motor B = roda direita
 
 //Potencias calibradas (%). Valores iniciais - calibre no carrinho real.
 int frenteEsq=80, frenteDir=80;
