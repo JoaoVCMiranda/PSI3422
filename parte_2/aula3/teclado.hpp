@@ -17,6 +17,7 @@
 #ifndef TECLADO_HPP
 #define TECLADO_HPP
 #include "../projeto.hpp"
+#include <csignal>
 
 class TECLADO {
   int lado;               //lado de cada botao, em pixels
@@ -134,6 +135,11 @@ public:
 // O fps depende da rede, entao nao da' para fixar 30 (o video sairia
 // acelerado). Guarda os primeiros N quadros, mede o fps com eles e so'
 // entao abre o VideoWriter.
+//
+// O AVI so' fica valido depois do release() (que grava o indice no fim do
+// arquivo). Por isso o video e' fechado em QUALQUER saida: ESC (destrutor),
+// queda da conexao (erro() -> exit() -> atexit), Ctrl+C e fechar o
+// terminal (sinais -> exit()).
 //---------------------------------------------------------------------------
 class GRAVADOR {
   static const unsigned N=20;
@@ -141,6 +147,19 @@ class GRAVADOR {
   VideoWriter vo;
   vector<Mat_<COR>> buf;
   double t0=0;
+  bool fechado=false;
+
+  static GRAVADOR*& ativo() { static GRAVADOR* g=NULL; return g; }
+  static void fechaAtivo() { if (ativo()) ativo()->fecha(); }
+  static void trataSinal(int) { exit(1); }   //exit() roda o atexit
+
+  void fecha() {
+    if (fechado) return;
+    fechado=true;
+    if (!vo.isOpened() && !buf.empty()) abre();  //programa curto: < N quadros
+    vo.release();
+    printf("Video %s fechado.\n", nome.c_str());
+  }
 
   void abre() {
     double dt=timeSinceEpoch()-t0;
@@ -156,7 +175,17 @@ class GRAVADOR {
   }
 
 public:
-  GRAVADOR(const string& n): nome(n) {}
+  GRAVADOR(const string& n): nome(n) {
+    ativo()=this;
+    static bool registrado=false;
+    if (!registrado) {
+      registrado=true;
+      atexit(fechaAtivo);
+      signal(SIGINT, trataSinal);    //Ctrl+C
+      signal(SIGTERM, trataSinal);   //kill
+      signal(SIGHUP, trataSinal);    //fechou a janela do terminal
+    }
+  }
 
   void grava(const Mat_<COR>& q) {
     if (vo.isOpened()) { vo << q; return; }
@@ -166,8 +195,8 @@ public:
   }
 
   ~GRAVADOR() {
-    if (!vo.isOpened() && !buf.empty()) abre();  //programa curto: < N quadros
-    vo.release();
+    fecha();
+    if (ativo()==this) ativo()=NULL;
   }
 };
 
