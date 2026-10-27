@@ -22,13 +22,13 @@
 // 0,1 e motor B = pinos 2,3. Qual pino de cada par e' "frente" depende de
 // como os fios do motor foram ligados: se "8" fizer uma roda girar para
 // tras, troque os dois pinos daquela roda aqui.
-// Conferido no nosso carrinho em 26/10/2026 (frente = lado da camera): o
-// motor A (pinos 0,1) e' a roda DIREITA e o B (2,3) a ESQUERDA, com os
-// pinos pares como "frente". Bate com o pwmroda4: 0 e 3 ligados giram o
-// carrinho no eixo.
+// Conferido roda a roda em 27/10/2026 (rodas no ar, frente = lado da
+// camera): o motor A (pinos 0,1) e' a roda ESQUERDA, com frente no pino 1,
+// e o B (2,3) a DIREITA, com frente no pino 2. Mesmo mapeamento do
+// ../../aula4/motores.hpp.
 //---------------------------------------------------------------------------
-const int ESQ_FRENTE=2, ESQ_TRAS=3;   //motor B = roda esquerda
-const int DIR_FRENTE=0, DIR_TRAS=1;   //motor A = roda direita
+const int ESQ_FRENTE=1, ESQ_TRAS=0;   //motor A = roda esquerda
+const int DIR_FRENTE=2, DIR_TRAS=3;   //motor B = roda direita
 
 //Potencias calibradas (%). Valores iniciais - calibre no carrinho real.
 int frenteEsq=80, frenteDir=80;

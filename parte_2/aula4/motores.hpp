@@ -8,9 +8,11 @@
 #include <softPwm.h>
 #include <csignal>
 
-//motor B (pinos 2,3) = roda esquerda, motor A (0,1) = direita; pares = frente
-const int ESQ_FRENTE=2, ESQ_TRAS=3;
-const int DIR_FRENTE=0, DIR_TRAS=1;
+//Conferido roda a roda em 27/10/2026 (rodas no ar, frente = lado da camera):
+//motor A (pinos 0,1) = roda ESQUERDA, frente no pino 1;
+//motor B (pinos 2,3) = roda DIREITA, frente no pino 2.
+const int ESQ_FRENTE=1, ESQ_TRAS=0;
+const int DIR_FRENTE=2, DIR_TRAS=3;
 
 //Potencias calibradas (%): 100% do comando = esta potencia naquela roda
 int frenteEsq=80, frenteDir=80;
