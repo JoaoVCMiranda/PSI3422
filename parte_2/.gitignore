@@ -15,3 +15,6 @@ aula2/client6b
 # Aula 3: executaveis nas pastas das tarefas (tudo que nao for .cpp)
 aula3/tarefa*/*
 !aula3/tarefa*/*.cpp
+# Aula 4: executaveis nas pastas das tarefas (tudo que nao for .cpp)
+aula4/tarefa*/*
+!aula4/tarefa*/*.cpp
