@@ -95,10 +95,17 @@ também o fps com leitura e gravação do vídeo.
 
 | Máquina | Sequencial (fps) | Paralelo (fps) |
 |---|---|---|
-| notebook 2 núcleos / 4 threads, OpenCV 4.6, g++ -O2, vídeo sintético | 11,2 | 19,4 |
-| Mint do projeto, `capturado2.avi` | _preencher_ | _preencher_ |
+Só a localização, sem `imshow`, num notebook com 2 núcleos físicos e 4 threads
+(OpenCV 4.6, g++ -O2):
 
-Sim, o paralelo é mais rápido: 1,7× com 2 núcleos físicos. Os 4 threads
+| Vídeo | Sequencial (fps) | Paralelo (fps) | Ganho |
+|---|---|---|---|
+| `capturado.avi` (1709 quadros) | 10,1 | 14,8 | 1,5× |
+| `capturado2.avi` (575 quadros) | 10,3 | 14,2 | 1,4× |
+| `capturado3.avi` (619 quadros) | 10,6 | 17,1 | 1,6× |
+| Mint do projeto | _preencher_ | _preencher_ | |
+
+Sim, o paralelo é mais rápido, mas fica longe de 4× porque são só 2 núcleos físicos. Os 4 threads
 lógicos (hyper-threading) não rendem 4×, como a apostila avisa (p. 11). Para
 conferir que todos os núcleos trabalham, rode o `htop` em outro terminal
 durante o `./aula4.sh fps`.
@@ -142,26 +149,40 @@ conexão, em Ctrl+C e em `kill`. Se algo der errado: `../aula2/paramotor`.
 demorar a corrigir, aumente. Se as rodas não vencerem o atrito com a placa
 quase centrada, aumente `VEL`. Se parar longe ou bater, ajuste `LADO_PERTO`.
 
-## Testes já feitos (sem hardware)
+## Resultados nos vídeos do professor
 
-Não tínhamos os vídeos do professor nesta máquina. O teste usou uma placa
-sintética (moldura preta, quadrado amarelo quase invisível, interior
-(255,255,255) com dígito) e um vídeo sintético 240×320 de 200 quadros: placa
-de 20 a 70 px em movimento, brilho/contraste variando, ruído, 20 quadros sem
-placa e fundo com retângulos.
+`./aula4.sh fps` gera `localiza_<video>_seq.avi` e `localiza_<video>_par.avi`:
 
-- **fase3/fase3p**: placa localizada nos 180 quadros que a têm, sem erro de
-  posição e com a escala certa. Saída idêntica nas duas versões.
-- **Falsos positivos**: nos 20 quadros sem placa, o fundo sintético tinha
-  retângulos **vazados de borda grossa** (formato de placa), e o NCC deu
-  ~0,65 > 0,55. Os verdadeiros tinham CC ≥ 0,57, e esses tinham CC ≤ 0,30.
-  Como nos vídeos reais um acerto pode ter CC baixo (0,16 na figura 4), não
-  pusemos limiar de CC às cegas. **Falta conferir nos `capturado*.avi`** e, se
-  houver falsos positivos, subir `LIMIAR_NCC` ou exigir um CC mínimo.
-- **servidor4/cliente4** por loopback, com wiringPi simulado e o vídeo no
-  lugar da câmera: placa à esquerda (x=54) → esq 30% / dir 80%; à direita
-  (x=267) → 80% / 30%; placa grande → parado. Na queda da conexão, os 4 pinos
-  recebem `softPwmStop`. O vídeo `t` saiu válido (~18 fps medidos).
+| Vídeo | Quadros | Placa achada |
+|---|---|---|
+| `capturado.avi` | 1709 | 863 |
+| `capturado2.avi` | 575 | 340 |
+| `capturado3.avi` | 619 | 345 |
 
-Falta validar no hardware: vídeos reais do professor, câmera, wifi e os
-ganhos do controle.
+- Quadro 140 do `capturado2.avi`, a referência da figura 4: achamos escala 9,
+  CC 12 e NCC 66. O professor obteve 9, 16 e 75.
+- **Falsos positivos**: procuramos detecções "isoladas", que pulam mais de 40 px
+  em relação às detecções dos quadros vizinhos (±3). Saiu **1 em 1548**
+  (`capturado3`, quadro 129, NCC 0,57, logo acima do limiar). Pelo quadro, é a
+  própria placa movida rápido e borrada. Por isso mantivemos `LIMIAR_NCC=0,55`.
+- Os quadros sem detecção são a placa fora do quadro, borrada pelo movimento
+  (como a figura 5) ou longe demais. Nesses casos o carrinho fica parado, que
+  é o erro menos grave.
+
+## Testes sem hardware (vídeo sintético)
+
+Antes de termos os vídeos do professor, testamos com uma placa e um vídeo
+sintéticos. A placa foi achada nos 180 quadros que a têm, e o `fase3` e o
+`fase3p` geraram vídeos idênticos byte a byte. O fundo sintético tinha
+retângulos vazados com formato de placa, que deram falso positivo (NCC ~0,65).
+Nos vídeos reais isso não apareceu (ver acima).
+
+### Fase 4 (servidor4/cliente4)
+
+Teste por loopback, com wiringPi simulado e um vídeo no lugar da câmera:
+placa à esquerda (x=54) dá esq 30% / dir 80%, placa à direita (x=267) dá
+80% / 30%, e placa grande deixa o carrinho parado. Na queda da conexão, os 4
+pinos recebem `softPwmStop`. O vídeo `t` saiu válido (~18 fps medidos).
+
+Falta validar no carrinho: câmera, wifi e os ganhos do controle (`VEL`,
+`GANHO`, `LADO_PERTO`).
