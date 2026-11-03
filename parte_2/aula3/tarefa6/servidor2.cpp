@@ -25,7 +25,7 @@
 // Conferido roda a roda em 27/10/2026 (rodas no ar, frente = lado da
 // camera): o motor A (pinos 0,1) e' a roda ESQUERDA, com frente no pino 1,
 // e o B (2,3) a DIREITA, com frente no pino 2. Mesmo mapeamento do
-// ../../aula4/motores.hpp.
+// ../../aula4/tarefa3/servidor4.cpp.
 //---------------------------------------------------------------------------
 const int ESQ_FRENTE=1, ESQ_TRAS=0;   //motor A = roda esquerda
 const int DIR_FRENTE=2, DIR_TRAS=3;   //motor B = roda direita

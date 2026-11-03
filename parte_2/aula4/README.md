@@ -6,15 +6,22 @@
 | [`tarefa2`](tarefa2/) | — | `fase3p` | **#2/3**: o mesmo, com os template matchings em paralelo (OpenMP) |
 | [`tarefa3`](tarefa3/) | `servidor4` | `cliente4` | **#3/3** (fase 4): o carrinho segue a placa |
 
-Arquivos compartilhados, na raiz de `aula4/`:
+**Cada programa é um arquivo único**, que dá para ler do começo ao fim sem
+abrir outro arquivo da aula. Por isso o detector (`struct CANDIDATO` + `class
+PLACA`) aparece **igual** no `fase3`, no `fase3p` e no `cliente4`. Se mudar o
+detector, mude nos três. A organização foi pensada para ensinar, não para
+economizar linhas:
 
-- [`placa.hpp`](placa.hpp): o detector (classe `PLACA`) e o laço de vídeo da fase 3
-  (`rodaFase3`). É usado pelas três lições, então uma melhoria no detector vale
-  para todas.
-- [`motores.hpp`](motores.hpp): mapeamento GPIO e calibração das rodas, os mesmos do
-  `../aula3/tarefa6/servidor2.cpp`.
-- `cliente4` reaproveita o `GRAVADOR` (vídeo com fps medido, fechado em qualquer
-  saída) e o `ARGCLIENTE` de [`../aula3/teclado.hpp`](../aula3/teclado.hpp).
+- **Passos com nome:** o detector é dividido em `calculaMapas` (PASSO 1),
+  `maximoEntreEscalas` (2), `escolheCandidatos` (3) e `escolheMelhor` (4).
+- **Origem de cada chamada:** uma etiqueta no comentário diz de onde ela vem
+  (`[OpenCV]`, `[raspberry.hpp]`, `[projeto.hpp]`, `[wiringPi]`, `[OpenMP]`, `[C]`).
+- **Dependências que ficaram de fora:** além do `../../projeto.hpp`, que vale
+  para o projeto todo, só o `cliente4` inclui outro arquivo. Ele reaproveita o
+  `GRAVADOR` (vídeo com fps medido, fechado em qualquer saída) e o `ARGCLIENTE`
+  de [`../aula3/teclado.hpp`](../aula3/teclado.hpp).
+- **Rodas:** o mapeamento e a calibração ficam no próprio `servidor4.cpp`
+  (seção RODAS), iguais aos do `../aula3/tarefa6/servidor2.cpp`.
 
 ## Antes de tudo: arquivos do professor
 
@@ -67,7 +74,7 @@ Segue a sugestão da apostila (p. 8):
    CC×100 e NCC×100.
 
 Os parâmetros (escalas, número de candidatos, limiar) são constantes no topo
-da classe `PLACA`.
+da classe `PLACA`, nos três programas.
 
 ## Lição #2/3: OpenMP
 
@@ -80,8 +87,9 @@ resultado), então basta:
 
 - `schedule(dynamic)`: os modelos grandes demoram mais que os pequenos, e o
   núcleo que fica livre pega o próximo.
-- `if(paralelo)`: `fase3` e `fase3p` usam **o mesmo código**. A única diferença
-  é esse flag (e o `-omp` na compilação). Assim a comparação de fps é justa.
+- `if(paralelo)`: `fase3` e `fase3p` têm **o mesmo detector**. A única diferença
+  é a linha `bool paralelo = false/true;` no `main` (e o `-omp` na compilação).
+  Assim a comparação de fps é justa.
 - `cv::setNumThreads(1)` nos dois: o OpenCV pode paralelizar o `matchTemplate`
   por dentro, o que faria o "sequencial" usar vários núcleos e brigaria com os
   threads do OpenMP. Assim, quem paraleliza é só o nosso laço.
