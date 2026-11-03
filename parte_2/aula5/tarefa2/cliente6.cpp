@@ -715,8 +715,11 @@ const double TEMPO_SEM_PLACA=1.0;  //s sem ver placa para sair do 4 FIM e recome
 //Movimentos (estado 3). Os tempos dependem do carrinho, da bateria e do chao:
 //CALIBRE: mande girar e ajuste ate' dar 90 e 180 graus.
 const double GIRO=0.70;         //velocidade de cada roda girando no proprio eixo
-const double TEMPO_90=0.80;     //s: giro de 90 graus
-const double TEMPO_180=1.60;    //s: giro de 180 graus
+//Medido em 03/11/2026: com GIRO=0.70, 1,6 s girou ~45 graus (~28 graus/s).
+//Como o angulo e' proporcional ao tempo (com a mesma velocidade):
+//  tempo = angulo / 28
+const double TEMPO_90=3.20;     //s: giro de 90 graus
+const double TEMPO_180=6.40;    //s: giro de 180 graus
 const double VEL_PASSA=0.70;    //velocidade para frente passando sob a placa
 const double TEMPO_PASSA=2.00;  //s: tempo andando reto para passar sob a placa
 
