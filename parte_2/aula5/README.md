@@ -157,10 +157,20 @@ Decisões de projeto:
 
 **Calibre no carrinho** (constantes no topo da seção MÁQUINA DE ESTADOS):
 
-- `TEMPO_90` (0,8 s) e `TEMPO_180` (1,6 s): mande girar e ajuste até dar 90° e 180°;
+- `TEMPO_90` (2,6 s) e `TEMPO_180` (4,8 s): mande girar e ajuste até dar 90° e 180°.
+  Não é proporcional (180° não é o dobro de 90°): o carrinho perde um tempo
+  vencendo o atrito antes de começar a girar;
 - `GIRO` (0,70): velocidade das rodas girando;
-- `TEMPO_PASSA` (2,0 s) e `VEL_PASSA`: o bastante para passar sob a placa;
+- `TEMPO_PASSA` (7,0 s) e `VEL_PASSA`: o bastante para passar sob a placa;
 - `TEMPO_PARADA` (0,8 s): se o dígito sair borrado no estado 2, aumente.
+
+Os valores entre parênteses foram calibrados no carrinho em 03/11/2026.
+**Depois de mudar uma constante, recompile** (`./aula5.sh build`). Ao iniciar,
+o `cliente6` imprime os tempos com que foi compilado:
+
+    tempos: 90 graus 2.60 s | 180 graus 4.80 s | passa por baixo 7.00 s | parada 0.80 s
+
+Se essa linha não mudou depois de uma alteração, faltou recompilar.
 
 A tela mostra, no alto, o estado, o dígito lido e a informação do estado
 (`dirx=-11`, `lendo 3/5`, `90 graus a esquerda (0.4s)`).

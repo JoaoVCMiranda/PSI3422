@@ -715,19 +715,20 @@ const double TEMPO_SEM_PLACA=1.0;  //s sem ver placa para sair do 4 FIM e recome
 //Movimentos (estado 3). Os tempos dependem do carrinho, da bateria e do chao:
 //CALIBRE: mande girar e ajuste ate' dar 90 e 180 graus.
 const double GIRO=0.70;         //velocidade de cada roda girando no proprio eixo
-//Medido em 03/11/2026: com GIRO=0.70, 1,6 s girou ~45 graus (~28 graus/s).
-//Como o angulo e' proporcional ao tempo (com a mesma velocidade):
-//  tempo = angulo / 28
-const double TEMPO_90=3.20;     //s: giro de 90 graus
-const double TEMPO_180=6.40;    //s: giro de 180 graus
+//Calibrado no carrinho em 03/11/2026, com GIRO=0.70 (testando e ajustando).
+//O angulo NAO e' proporcional ao tempo: o carrinho perde um tempo vencendo o
+//atrito antes de comecar a girar, por isso 180 graus nao e' o dobro de 90.
+//Mudou a bateria, o chao ou o GIRO? Calibre de novo.
+const double TEMPO_90=2.60;     //s: giro de 90 graus
+const double TEMPO_180=4.80;    //s: giro de 180 graus
 //Passar por baixo (4 e 5): anda reto por TEMPO_PASSA, sem olhar a placa, e
 //volta ao estado 0. O carrinho para a ~30 cm da placa (LADO_PERTO), entao
 //precisa andar esses ~30 cm MAIS o proprio comprimento.
-//Medido em 03/11/2026: 2,0 s nao bastaram (parou ainda antes da placa,
-//viu o 5 de novo e releu). Se passar e ainda parar logo depois, ou bater
-//em algo adiante, ajuste aqui.
+//Calibrado no carrinho em 03/11/2026 (2 e 4 s nao bastavam: parava antes da
+//placa, via o 5 de novo e relia). Se passar e ainda parar logo depois, ou
+//bater em algo adiante, ajuste aqui.
 const double VEL_PASSA=0.70;    //velocidade para frente passando sob a placa
-const double TEMPO_PASSA=4.00;  //s: tempo andando reto para passar sob a placa
+const double TEMPO_PASSA=7.00;  //s: tempo andando reto para passar sob a placa
 
 //---------------------------------------------------------------------------
 // ESTADO: os 6 estados, com os numeros da figura 6.
@@ -1043,6 +1044,10 @@ int main(int argc, char *argv[]) {
   DIGITO digito(arqPlaca, achaMnist());      //le o MNIST e treina o FLANN (~2 s)
   PLACA placa(arqPlaca, true);               //detector paralelo
   printf("cliente6: localizando com %d thread(s)\n", placa.threads());
+  //Mostra os tempos com que ESTE executavel foi compilado. Mudou uma
+  //constante e o valor aqui nao mudou? Faltou recompilar (./aula5.sh build).
+  printf("tempos: 90 graus %.2f s | 180 graus %.2f s | passa por baixo %.2f s | parada %.2f s\n",
+         TEMPO_90, TEMPO_180, TEMPO_PASSA, TEMPO_PARADA);
   CLIENT client(arg.ip);                     //[projeto.hpp] conecta no servidor6
 
   namedWindow("cliente6");                   //[OpenCV]
