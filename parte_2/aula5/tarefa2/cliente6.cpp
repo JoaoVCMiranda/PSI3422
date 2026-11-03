@@ -720,8 +720,14 @@ const double GIRO=0.70;         //velocidade de cada roda girando no proprio eix
 //  tempo = angulo / 28
 const double TEMPO_90=3.20;     //s: giro de 90 graus
 const double TEMPO_180=6.40;    //s: giro de 180 graus
+//Passar por baixo (4 e 5): anda reto por TEMPO_PASSA, sem olhar a placa, e
+//volta ao estado 0. O carrinho para a ~30 cm da placa (LADO_PERTO), entao
+//precisa andar esses ~30 cm MAIS o proprio comprimento.
+//Medido em 03/11/2026: 2,0 s nao bastaram (parou ainda antes da placa,
+//viu o 5 de novo e releu). Se passar e ainda parar logo depois, ou bater
+//em algo adiante, ajuste aqui.
 const double VEL_PASSA=0.70;    //velocidade para frente passando sob a placa
-const double TEMPO_PASSA=2.00;  //s: tempo andando reto para passar sob a placa
+const double TEMPO_PASSA=4.00;  //s: tempo andando reto para passar sob a placa
 
 //---------------------------------------------------------------------------
 // ESTADO: os 6 estados, com os numeros da figura 6.
