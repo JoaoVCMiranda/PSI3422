@@ -3,6 +3,7 @@
 | Pasta | Raspberry | Computador | Lição |
 |---|---|---|---|
 | [`tarefa1`](tarefa1/) | — | `fase5` | **#1/2** (fase 5): localiza a placa e lê o dígito escrito nela |
+| [`tarefa2`](tarefa2/) | `servidor6` | `cliente6` | **#2/2** (fase 6): o carrinho segue o caminho indicado pelos dígitos |
 
 Como na aula 4, **cada programa é um arquivo único**, comentado passo a passo
 com etiquetas de origem (`[OpenCV]`, `[raspberry.hpp]`, `[C]` …). O
@@ -34,7 +35,13 @@ Basta descompactar e trocar o primeiro `-` do nome por `.`.
 Ou na mão (de dentro de `aula5/`):
 
     computador$ (cd tarefa1 && compila fase5 -ocv -v3 -omp)
+    computador$ (cd tarefa2 && compila cliente6 -ocv -v3 -omp)
+    raspberry$  (cd tarefa2 && compila servidor6 -ocv -w)
+
     computador$ tarefa1/fase5 capturado.avi quadrado.png locarec.avi
+
+    raspberry$  tarefa2/servidor6 [frenteEsq frenteDir reEsq reDir]
+    computador$ tarefa2/cliente6 100.70.100.51 [videosaida.avi] [t/c]
 
 ## Lição #1/2: como o dígito é lido
 
@@ -97,3 +104,78 @@ As 10 placas são lidas certo, e os 4 erros são quadros isolados. Exemplo: um
 "0" aberto em cima e de traço fino lido como "6". Para a fase 6, onde o
 carrinho age a partir do dígito, vale decidir pela **maioria de alguns quadros
 seguidos**, e não por um quadro só.
+
+## Lição #2/2: máquina de estados (fase 6)
+
+Toda a lógica fica no `cliente6`. O `servidor6` é o `servidor4` da aula 4 com
+uma única novidade, o descarte de quadros velhos da câmera (`grab()` 2 vezes
+antes de cada `read`, apostila p. 13). O protocolo é o mesmo: `'m' esq dir`
+ou `'s'`.
+
+O `cliente6.cpp` é um arquivo único com quatro partes:
+
+1. **DETECTOR DA PLACA:** cópia exata do `cliente4`.
+2. **LEITOR DO DÍGITO:** cópia exata do `fase5`.
+3. **MÁQUINA DE ESTADOS:** a figura 6 da apostila, desenhada em ASCII no
+   código, com um método por estado.
+4. **TELA E PROGRAMA:** o laço do `cliente4`, mais os painéis do dígito.
+
+| Estado | O que faz | Sai quando |
+|---|---|---|
+| **0 SEGUE** | segue a placa (controle da fase 4); sem placa, fica parado | placa grande (lado ≥ 60 px) → 1 |
+| **1 PARA** | motores desligados | passou `TEMPO_PARADA` (0,8 s) → 2 |
+| **2 LE** | lê o dígito com o carrinho parado; junta 5 leituras e vence a maioria | 0 ou 1 → 4 · 2–9 → 3 · 15 quadros sem conseguir → 0 |
+| **3 MOVE** | faz o movimento do dígito durante o seu tempo | passou o tempo → 5 |
+| **4 FIM** | manda `'s'`: termina o `cliente6` e o `servidor6` | — |
+| **5 TERMINA** | motores desligados, espera o giro acabar | passou `TEMPO_PARADA` → 0 |
+
+Comandos (2025): **0/1** fim · **2** 180° à esquerda · **3** 180° à direita
+· **4/5** passa por baixo da placa · **6/7** 90° à esquerda · **8/9** 90° à
+direita. Girar = uma roda para frente e a outra para trás.
+
+Decisões de projeto:
+
+- **Um passo por quadro:** a apostila sugere uma variável `estado` com um
+  `if` por estado dentro de um laço. O nosso laço é o do `main`, que roda uma
+  vez por quadro, porque cada volta tem que devolver um comando ao servidor.
+  O método `MAQUINA::passo()` executa o estado atual uma vez.
+- **Tempo em segundos, não em quadros:** o fps muda com a rede. Cada estado
+  guarda quando começou (`inicioEstado`) e compara com o relógio.
+- **Rodas paradas por padrão:** `passo()` zera as rodas antes de rodar o
+  estado. Só os estados 0 e 3 as ligam, então nenhum estado esquece o motor
+  ligado.
+- **Maioria de 5 leituras no estado 2:** uma leitura isolada erra ~1% das
+  vezes (lição #1), e um erro faria o carrinho virar para o lado errado.
+- **Cada transição é impressa no terminal**, com o motivo. Ex.:
+  `estado 2 LE -> 3 MOVE (li o digito 7: 90 graus a esquerda)`.
+
+**Calibre no carrinho** (constantes no topo da seção MÁQUINA DE ESTADOS):
+
+- `TEMPO_90` (0,8 s) e `TEMPO_180` (1,6 s): mande girar e ajuste até dar 90° e 180°;
+- `GIRO` (0,70): velocidade das rodas girando;
+- `TEMPO_PASSA` (2,0 s) e `VEL_PASSA`: o bastante para passar sob a placa;
+- `TEMPO_PARADA` (0,8 s): se o dígito sair borrado no estado 2, aumente.
+
+A tela mostra, no alto, o estado, o dígito lido e a informação do estado
+(`dirx=-11`, `lendo 3/5`, `90 graus a esquerda (0.4s)`).
+
+### Teste sem o carrinho
+
+O teste foi feito pela rede local deste PC, com wiringPi simulado e o
+`capturado.avi` no lugar da câmera. A cópia de teste do servidor repete o
+mesmo quadro enquanto as rodas estão paradas, imitando o carrinho parado na
+frente de uma placa fixa. No vídeo cru, quem segura a placa a tira de cena
+durante a espera do estado 1.
+
+    estado 0 SEGUE   -> 1 PARA     (placa grande: para para ler)
+    estado 1 PARA    -> 2 LE       (carrinho parado)
+    estado 2 LE      -> 3 MOVE     (li o digito 3: 180 graus a direita)
+    estado 3 MOVE    -> 5 TERMINA  (fim do movimento)
+    estado 5 TERMINA -> 0 SEGUE    (carrinho parado)
+    ...              (7: 90 graus a esquerda, 9: 90 graus a direita)
+    estado 2 LE      -> 4 FIM      (li o digito 0: fim do caminho)
+    Fim do caminho (digito 0)          servidor: "server: fechei conexao."
+
+Cada placa do vídeo aparece duas vezes no log, porque no vídeo o "carrinho"
+não gira de verdade e a placa continua na frente. Falta testar no carrinho
+real e calibrar os tempos dos giros.

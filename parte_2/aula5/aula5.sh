@@ -69,9 +69,10 @@ constroi() {
 cmd_build() {
   echo "Compilando em: $ONDE"
   if [ "$ONDE" = raspberry ]; then
-    echo "  (a licao #1/2 roda so' no computador)"
+    constroi tarefa2/servidor6 -ocv -w
   else
     constroi tarefa1/fase5 -ocv -v3 -omp
+    constroi tarefa2/cliente6 -ocv -v3 -omp
   fi
 }
 
@@ -95,6 +96,7 @@ aula5.sh - Aula 5 (PSI3422 parte 2)    [local: $ONDE]
 
 Depois (ver README.md):
   tarefa1/fase5 capturado.avi quadrado.png locarec.avi
+  tarefa2/servidor6 (Raspberry) | tarefa2/cliente6 <ip> [video.avi] [t/c]
 AJUDA
   ;;
 esac
