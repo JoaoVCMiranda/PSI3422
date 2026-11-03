@@ -663,9 +663,16 @@ string achaMnist() {
 //                 v                                     |        |
 //            +-------------------------------+  nao conseguiu ler|
 //            |  2 LE: le o digito (parado),  |----------+        |
-//            |  VOTOS leituras, vence a      |                   |
-//            |  maioria                      |--- 0 ou 1 --> 4 FIM: termina
-//            +-------------------------------+     (cliente6 e servidor6)
+//            |  VOTOS leituras, vence a      |          |        |
+//            |  maioria                      |          |        |
+//            +-------------------------------+          |        |
+//                 |                  | 0 ou 1           |        |
+//                 |                  v                  |        |
+//                 |    +-------------------------+      |        |
+//                 |    | 4 FIM: fim do caminho,  |------+        |
+//                 |    | parado enquanto a placa | placa saiu    |
+//                 |    | estiver a vista         | de vista      |
+//                 |    +-------------------------+               |
 //                 | 2..9: guarda o digito,                       |
 //                 v       zera o cronometro                      |
 //            +-------------------------------+                   |
@@ -689,6 +696,11 @@ string achaMnist() {
 // Tempos em SEGUNDOS, nao em quadros (apostila, p. 8): o fps muda com a
 // rede, e "girar 13 quadros" daria angulos diferentes a cada vez. Cada
 // estado guarda quando comecou (inicioEstado) e compara com o relogio.
+//
+// Diferenca da apostila no estado 4: la' o 0/1 TERMINA os dois programas.
+// Aqui o carrinho so' para e espera a placa sair de vista; entao volta ao
+// estado 0 e procura a proxima. Assim da' para testar varias placas sem
+// reiniciar cliente6 e servidor6. Os programas so' terminam com ESC.
 
 //---- Parametros (ajuste no carrinho real) ----
 //Seguir a placa (estado 0): o mesmo controle do cliente4
@@ -699,6 +711,7 @@ const int LADO_PERTO=60;        //placa com lado >= isto (escalas 0 e 1): perto
 const double TEMPO_PARADA=0.8;  //s: tempo para a inercia acabar (estados 1 e 5)
 const int VOTOS=5;              //leituras que o estado 2 junta antes de decidir
 const int MAX_TENTATIVAS=15;    //quadros no estado 2 sem VOTOS leituras: desiste
+const double TEMPO_SEM_PLACA=1.0;  //s sem ver placa para sair do 4 FIM e recomecar
 //Movimentos (estado 3). Os tempos dependem do carrinho, da bateria e do chao:
 //CALIBRE: mande girar e ajuste ate' dar 90 e 180 graus.
 const double GIRO=0.70;         //velocidade de cada roda girando no proprio eixo
@@ -749,7 +762,7 @@ MOVIMENTO movimentoDoDigito(int d) {
 // MAQUINA: a maquina de estados. Uso, a cada quadro:
 //    maquina.passo(placa, digito);   //anda um passo
 //    maquina.esq, maquina.dir        //velocidade para mandar ao servidor6
-//    maquina.estado == FIM           //acabou: termina os dois programas
+//    maquina.estado                  //o estado atual (para a tela)
 //---------------------------------------------------------------------------
 class MAQUINA {
 public:
@@ -761,6 +774,7 @@ public:
 
 private:
   double inicioEstado;     //quando entrou no estado atual [segundos]
+  double ultimaPlaca;      //estado 4: quando viu a placa pela ultima vez [segundos]
   MOVIMENTO movimento;     //o movimento do estado 3
   int votos[10];           //estado 2: votos[d] = quantas leituras deram d
   int leituras;            //estado 2: quantas leituras ja' juntou
@@ -783,8 +797,8 @@ public:
     else if (estado == PARA)    estado1_para();
     else if (estado == LE)      estado2_le(digito);
     else if (estado == MOVE)    estado3_move();
+    else if (estado == FIM)     estado4_fim(placa);
     else if (estado == TERMINA) estado5_termina();
-    //estado == FIM: nao faz nada (rodas paradas); o main termina o programa
   }
 
   //Segundos desde que entrou no estado atual (o "cronometro").
@@ -843,7 +857,7 @@ private:
   // Uma leitura erra de vez em quando (1% no capturado.avi, ver
   // ../tarefa1); um erro aqui faria o carrinho virar para o lado errado.
   // Entao juntamos VOTOS leituras e vence o digito mais lido (maioria).
-  //   VOTOS leituras: 0 ou 1 -> 4 FIM;  2..9 -> 3 MOVE
+  //   VOTOS leituras: 0 ou 1 -> 4 FIM (para);  2..9 -> 3 MOVE
   //   MAX_TENTATIVAS quadros sem conseguir (placa sumiu, sem digito...):
   //                  volta para o 0 (a apostila manda voltar ao 0)
   //=========================================================================
@@ -865,7 +879,8 @@ private:
       digitoLido = maisVotado();
       string lido = "li o digito " + to_string(digitoLido);
       if (digitoLido == 0 || digitoLido == 1) {
-        vaiPara(FIM, lido + ": fim do caminho");
+        ultimaPlaca = timeSinceEpoch();    //a placa esta' a vista agora
+        vaiPara(FIM, lido + ": fim do caminho, parado");
       } else {
         movimento = movimentoDoDigito(digitoLido);
         vaiPara(MOVE, lido + ": " + movimento.nome);   //zera o cronometro
@@ -900,6 +915,23 @@ private:
       dir = 0;
       vaiPara(TERMINA, "fim do movimento");
     }
+  }
+
+  //=========================================================================
+  // Estado 4 - FIM: fim do caminho (digito 0 ou 1). O carrinho fica parado
+  // enquanto a placa estiver a vista. Quando ela some por TEMPO_SEM_PLACA
+  // (alguem a tirou, ou o carrinho foi levado para outro lugar), volta ao
+  // estado 0 e procura a proxima placa. (A apostila termina os programas
+  // aqui; ver a "Diferenca da apostila" no topo desta secao.)
+  // Por que esperar a placa SUMIR, e nao so' um tempo? Se voltasse ao 0 com
+  // a placa 0 ainda na frente, leria o 0 de novo e ficaria nesse vai-e-vem.
+  //=========================================================================
+  void estado4_fim(const PLACA& placa) {
+    if (placa.achou) ultimaPlaca = timeSinceEpoch();   //ainda vejo a placa
+    double semPlaca = timeSinceEpoch() - ultimaPlaca;
+    info = "fim do caminho: parado (tire a placa para recomecar)";
+    if (semPlaca >= TEMPO_SEM_PLACA)
+      vaiPara(SEGUE, "placa saiu de vista: procura a proxima");
   }
 
   //=========================================================================
@@ -1033,15 +1065,13 @@ int main(int argc, char *argv[]) {
     imshow("cliente6", tela);                  //[OpenCV]
     if (gravador) gravador->grava(arg.modo=='c' ? img : tela);   //'c': so' a camera
 
-    //d) comando ao servidor6. Termina com ESC ou no estado 4 FIM
-    //   (digito 0 ou 1): o 's' tambem termina o servidor6.
+    //d) comando ao servidor6. So' o ESC termina: o 's' tambem termina o
+    //   servidor6. (O estado 4 FIM so' para o carrinho.)
     bool esc = apertouEsc();
-    bool termina = esc || maquina.estado == FIM;
-    montaComando(termina, maquina.esq, maquina.dir, cmd);
+    montaComando(esc, maquina.esq, maquina.dir, cmd);
     client.sendBytes(3,cmd);                   //[projeto.hpp]
-    if (termina) {
-      if (esc) printf("ESC: fim\n");
-      else     printf("Fim do caminho (digito %d)\n", maquina.digitoLido);
+    if (esc) {
+      printf("ESC: fim\n");
       break;
     }
   }

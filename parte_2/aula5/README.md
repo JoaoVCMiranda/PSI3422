@@ -126,7 +126,7 @@ O `cliente6.cpp` é um arquivo único com quatro partes:
 | **1 PARA** | motores desligados | passou `TEMPO_PARADA` (0,8 s) → 2 |
 | **2 LE** | lê o dígito com o carrinho parado; junta 5 leituras e vence a maioria | 0 ou 1 → 4 · 2–9 → 3 · 15 quadros sem conseguir → 0 |
 | **3 MOVE** | faz o movimento do dígito durante o seu tempo | passou o tempo → 5 |
-| **4 FIM** | manda `'s'`: termina o `cliente6` e o `servidor6` | — |
+| **4 FIM** | fim do caminho: fica parado enquanto a placa 0/1 estiver à vista | placa sumiu por 1 s → 0 |
 | **5 TERMINA** | motores desligados, espera o giro acabar | passou `TEMPO_PARADA` → 0 |
 
 Comandos (2025): **0/1** fim · **2** 180° à esquerda · **3** 180° à direita
@@ -135,6 +135,12 @@ direita. Girar = uma roda para frente e a outra para trás.
 
 Decisões de projeto:
 
+- **Diferença da apostila no estado 4:** na apostila, o 0/1 termina os dois
+  programas. Aqui o carrinho só para e espera a placa sair de vista. Depois
+  volta ao estado 0 e procura a próxima, então dá para testar várias placas
+  sem reiniciar nada. Os programas só terminam com **ESC**. Ele espera a
+  placa *sumir*, e não só um tempo, porque voltar ao 0 com a placa 0 ainda na
+  frente faria o carrinho ler o 0 de novo e entrar num vai-e-vem.
 - **Um passo por quadro:** a apostila sugere uma variável `estado` com um
   `if` por estado dentro de um laço. O nosso laço é o do `main`, que roda uma
   vez por quadro, porque cada volta tem que devolver um comando ao servidor.
@@ -173,9 +179,13 @@ durante a espera do estado 1.
     estado 3 MOVE    -> 5 TERMINA  (fim do movimento)
     estado 5 TERMINA -> 0 SEGUE    (carrinho parado)
     ...              (7: 90 graus a esquerda, 9: 90 graus a direita)
-    estado 2 LE      -> 4 FIM      (li o digito 0: fim do caminho)
-    Fim do caminho (digito 0)          servidor: "server: fechei conexao."
+    estado 2 LE      -> 4 FIM      (li o digito 0: fim do caminho, parado)
+    estado 4 FIM     -> 0 SEGUE    (placa saiu de vista: procura a proxima)
+    ...              (4: passa por baixo, 8: 90 graus a direita, 2: 180 a esquerda)
+    estado 2 LE      -> 4 FIM      (li o digito 1: fim do caminho, parado)
+    estado 4 FIM     -> 0 SEGUE    (placa saiu de vista: procura a proxima)
+    ...              (5: passa por baixo; o video acaba antes da placa 6)
 
-Cada placa do vídeo aparece duas vezes no log, porque no vídeo o "carrinho"
-não gira de verdade e a placa continua na frente. Falta testar no carrinho
+Todas as placas foram lidas certo. Algumas aparecem duas vezes no log,
+porque no vídeo o "carrinho" não gira de verdade e a placa continua na frente. Falta testar no carrinho
 real e calibrar os tempos dos giros.
