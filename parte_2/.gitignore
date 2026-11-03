@@ -18,3 +18,10 @@ aula3/tarefa*/*
 # Aula 4: executaveis nas pastas das tarefas (tudo que nao for .cpp)
 aula4/tarefa*/*
 !aula4/tarefa*/*.cpp
+# Aula 5: executaveis nas pastas das tarefas (tudo que nao for .cpp)
+aula5/tarefa*/*
+!aula5/tarefa*/*.cpp
+# MNIST (55 MB, vem do mnist.zip do professor) e zips de transferencia
+*.idx1-ubyte
+*.idx3-ubyte
+*.zip

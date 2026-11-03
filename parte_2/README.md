@@ -101,6 +101,7 @@ curto acidental. Use sempre fios com conector fêmea.
 | `aula2/server6b.cpp` / `client6b.cpp` | **lição #3/3** — teste de `sendBytes`/`receiveBytes` |
 | `aula3/` | **aula 3** — `sendUint`/`sendVb`, câmera pela rede (crua e JPEG), teclado virtual e controle dos motores. Ver [`aula3/README.md`](aula3/README.md) |
 | `aula4/` | **aula 4** — template matching CC+NCC (fase 3), OpenMP e carrinho seguindo a placa (fase 4). Ver [`aula4/README.md`](aula4/README.md) |
+| `aula5/` | **aula 5** — leitura do dígito manuscrito na placa com MNIST + FLANN (fase 5). Ver [`aula5/README.md`](aula5/README.md) |
 
 ## 3.1 Script de uso (`aula2/aula2.sh`)
 
