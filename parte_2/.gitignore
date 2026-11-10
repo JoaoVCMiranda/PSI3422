@@ -25,3 +25,6 @@ aula5/tarefa*/*
 *.idx1-ubyte
 *.idx3-ubyte
 *.zip
+# Aula 6: executaveis nas pastas das tarefas (tudo que nao for .cpp)
+aula6/tarefa*/*
+!aula6/tarefa*/*.cpp
