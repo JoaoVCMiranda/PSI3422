@@ -45,6 +45,7 @@ struct CANDIDATO {
 //    PLACA placa("quadrado.png", paralelo);   //prepara os modelos (uma vez)
 //    if (placa.procura(quadroCinza)) ...      //a cada quadro
 //    placa.melhor.c, placa.melhor.l, ...      //onde achou
+//    placa.desenha(quadro);                   //marca o resultado no quadro
 //---------------------------------------------------------------------------
 class PLACA {
 public:
@@ -93,73 +94,17 @@ public:
     //OpenMP na versao paralela. Assim quem paraleliza e' so' o nosso laco.
     setNumThreads(1);                                 //[OpenCV]
 
-    Mat_<FLT> placaCinza = lePlaca(arqModelo);
-    preparaModelos(placaCinza);
-
-    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
-    mapaCC.resize(NESC);
-    mapaNCC.resize(NESC);
-  }
-
-  int ladoEscala(int s) const { return lado[s]; }
-
-  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
-  int threads() const {
-#ifdef _OPENMP
-    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
-    else return 1;
-#else
-    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
-#endif
-  }
-
-  //=========================================================================
-  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
-  //=========================================================================
-  bool procura(const Mat_<FLT>& f) {
-    calculaMapas(f);                              //PASSO 1 (pesado)
-
-    Mat_<FLT> ccMaximo;      //ccMaximo(l,c)   = maior CC entre as escalas
-    Mat_<int> escalaMaximo;  //escalaMaximo(l,c) = escala que deu esse maior CC
-    maximoEntreEscalas(f.rows, f.cols, ccMaximo, escalaMaximo);   //PASSO 2
-
-    escolheCandidatos(ccMaximo, escalaMaximo);    //PASSO 3
-    escolheMelhor();                              //PASSO 4
-    return achou;
-  }
-
-  //=========================================================================
-  // desenha: marca o resultado no quadro colorido a, como na figura 4:
-  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
-  //   amarelo = a placa encontrada (so' se achou)
-  //=========================================================================
-  void desenha(Mat_<COR>& a) const {
-    for (int k=0; k<(int)candidatos.size(); k++)
-      desenhaCandidato(a, candidatos[k]);
-    if (achou)
-      desenhaMelhor(a);
-  }
-
-private:
-  //=========================================================================
-  // Preparacao (construtor)
-  //=========================================================================
-
-  //Le quadrado.png e converte para niveis de cinza 0..1.
-  //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
-  //que ao virar cinza fica exatamente 1.0 (branco puro).
-  //("static": esta funcao nao usa nenhum campo da classe)
-  static Mat_<FLT> lePlaca(const string& arqModelo) {
+    //---- Le quadrado.png e converte para niveis de cinza 0..1 ----
+    //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
+    //que ao virar cinza fica exatamente 1.0 (branco puro).
     Mat_<COR> placaCor = imread(arqModelo, 1);        //[OpenCV] 1 = ler colorida
     if (placaCor.empty()) erro("Erro leitura "+arqModelo);   //[raspberry.hpp]
     Mat_<FLT> placaCinza;
     converte(placaCor, placaCinza);                   //[raspberry.hpp] cor -> cinza 0..1
-    return placaCinza;
-  }
 
-  //Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os dois
-  //modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC elementos.
-  void preparaModelos(const Mat_<FLT>& placaCinza) {
+    //---- Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os
+    //dois modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC
+    //elementos. ----
     //PROGRESSAO GEOMETRICA: cada escala e' a anterior vezes "razao".
     //Por que nao aritmetica? O tamanho aparente da placa e' inversamente
     //proporcional a distancia. Com razao constante, o salto RELATIVO entre
@@ -197,27 +142,44 @@ private:
 
       lado.push_back(n);
     }
+
+    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
+    mapaCC.resize(NESC);
+    mapaNCC.resize(NESC);
+  }
+
+  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
+  int threads() const {
+#ifdef _OPENMP
+    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
+    else return 1;
+#else
+    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
+#endif
   }
 
   //=========================================================================
-  // PASSO 1 - calculaMapas: os 2*NESC template matchings (parte pesada)
+  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
   //=========================================================================
-  //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
-  //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
-  //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
-  //
-  //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
-  //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
-  //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
-  //#pragma abaixo pede ao OpenMP:
-  //   parallel for      divide as iteracoes do for entre os threads
-  //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
-  //                     (os modelos grandes demoram mais que os pequenos;
-  //                     dividir em blocos fixos deixaria nucleos ociosos)
-  //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
-  //                     fase3p usam EXATAMENTE o mesmo codigo.
-  //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
-  void calculaMapas(const Mat_<FLT>& f) {
+  bool procura(const Mat_<FLT>& f) {
+    //---------------------------------------------------------------------
+    // PASSO 1 - os 2*NESC template matchings (parte pesada)
+    //---------------------------------------------------------------------
+    //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
+    //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
+    //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
+    //
+    //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
+    //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
+    //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
+    //#pragma abaixo pede ao OpenMP:
+    //   parallel for      divide as iteracoes do for entre os threads
+    //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
+    //                     (os modelos grandes demoram mais que os pequenos;
+    //                     dividir em blocos fixos deixaria nucleos ociosos)
+    //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
+    //                     fase3p usam EXATAMENTE o mesmo codigo.
+    //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
     #pragma omp parallel for schedule(dynamic) if(paralelo)
     for (int i=0; i<2*NESC; i++) {
       int s = i/2;                  //escala desta tarefa
@@ -232,35 +194,29 @@ private:
       if (ehCC) mapaCC[s]  = matchTemplateSame(f, modeloCC[s],  CV_TM_CCORR,         0.0);
       else      mapaNCC[s] = matchTemplateSame(f, modeloNCC[s], CV_TM_CCOEFF_NORMED, 0.0);
     }
-  }
 
-  //=========================================================================
-  // PASSO 2 - maximoEntreEscalas: um mapa so', com o melhor CC de cada pixel
-  //=========================================================================
-  //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
-  //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
-  //(ccMaximo e escalaMaximo sao referencias: sao as variaveis do procura())
-  void maximoEntreEscalas(int nl, int nc, Mat_<FLT>& ccMaximo, Mat_<int>& escalaMaximo) const {
-    ccMaximo = mapaCC[0].clone();               //copia de verdade do mapa da escala 0
-    escalaMaximo = Mat_<int>(nl, nc, 0);        //matriz nl x nc de int, toda com 0
-
+    //---------------------------------------------------------------------
+    // PASSO 2 - um mapa so', com o melhor CC de cada pixel
+    //---------------------------------------------------------------------
+    //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
+    //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
+    Mat_<FLT> ccMaximo = mapaCC[0].clone();         //ccMaximo(l,c) = maior CC entre as escalas
+    Mat_<int> escalaMaximo(f.rows, f.cols, 0);      //escalaMaximo(l,c) = escala desse maior CC
     for (int s=1; s<NESC; s++)
-      for (int l=0; l<nl; l++)
-        for (int c=0; c<nc; c++)
+      for (int l=0; l<f.rows; l++)
+        for (int c=0; c<f.cols; c++)
           if (mapaCC[s](l,c) > ccMaximo(l,c)) {
             ccMaximo(l,c) = mapaCC[s](l,c);
             escalaMaximo(l,c) = s;
           }
-  }
 
-  //=========================================================================
-  // PASSO 3 - escolheCandidatos: os NCAND maiores picos de CC
-  //=========================================================================
-  //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
-  //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
-  //maiores valores seriam todos pixels vizinhos do MESMO pico.
-  //ATENCAO: altera ccMaximo (por isso ele e' uma copia, feita no PASSO 2).
-  void escolheCandidatos(Mat_<FLT>& ccMaximo, const Mat_<int>& escalaMaximo) {
+    //---------------------------------------------------------------------
+    // PASSO 3 - os NCAND maiores picos de CC
+    //---------------------------------------------------------------------
+    //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
+    //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
+    //maiores valores seriam todos pixels vizinhos do MESMO pico.
+    //(Por isso o ccMaximo e' uma copia, feita no PASSO 2: aqui ele e' alterado.)
     candidatos.clear();                         //esvazia o array do quadro anterior
     for (int k=0; k<NCAND; k++) {
       //minMaxLoc [OpenCV]: varre a imagem e devolve o maior valor (vmax) e
@@ -286,12 +242,10 @@ private:
         for (int c=cIni; c<=cFim; c++)
           ccMaximo(l,c) = -1;
     }
-  }
 
-  //=========================================================================
-  // PASSO 4 - escolheMelhor: o candidato de maior NCC, se passar do limiar
-  //=========================================================================
-  void escolheMelhor() {
+    //---------------------------------------------------------------------
+    // PASSO 4 - o candidato de maior NCC, se passar do limiar
+    //---------------------------------------------------------------------
     achou = false;
     for (int k=0; k<(int)candidatos.size(); k++) {
       bool primeiro = !achou;
@@ -303,41 +257,46 @@ private:
     //Ate' aqui "achou" so' quer dizer "havia pelo menos um candidato".
     //Agora a decisao de verdade: o NCC tem que ser alto o bastante.
     if (achou && melhor.ncc < LIMIAR_NCC) achou = false;
+    return achou;
   }
 
   //=========================================================================
-  // Desenho
+  // desenha: marca o resultado no quadro colorido a, como na figura 4:
+  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
+  //   amarelo = a placa encontrada (so' se achou)
   //=========================================================================
+  void desenha(Mat_<COR>& a) const {
+    //---- Cada candidato: quadrado ciano + 3 numeros empilhados a direita ----
+    const Scalar ciano(255,255,0);         //cor na ordem B,G,R
+    for (int k=0; k<(int)candidatos.size(); k++) {
+      const CANDIDATO& cd = candidatos[k];
+      int metade = cd.lado/2;
+      //Rect(coluna do canto, linha do canto, largura, altura)
+      rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
 
-  //Quadrado ciano + 3 numeros empilhados a direita: escala, CC x100, NCC x100.
-  static void desenhaCandidato(Mat_<COR>& a, const CANDIDATO& cd) {
-    const Scalar ciano(255,255,0);       //cor na ordem B,G,R
-    int metade = cd.lado/2;
-    //Rect(coluna do canto, linha do canto, largura, altura)
-    rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
-
-    int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
-    int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
-    int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
-    for (int k=0; k<3; k++) {
-      //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
-      putText(a, to_string(numeros[k]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
-      y += 8;                            //proxima linha
+      int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
+      int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
+      int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
+      for (int j=0; j<3; j++) {
+        //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
+        putText(a, to_string(numeros[j]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
+        y += 8;                            //proxima linha
+      }
     }
-  }
 
-  //Quadrado amarelo (mais grosso) + "escala CC NCC" acima dele.
-  void desenhaMelhor(Mat_<COR>& a) const {
-    const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
-    int metade = melhor.lado/2;
-    rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
+    //---- A placa encontrada: quadrado amarelo (mais grosso) + "escala CC NCC" ----
+    if (achou) {
+      const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
+      int metade = melhor.lado/2;
+      rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
 
-    //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
-    string texto = to_string(melhor.s) + " " +
-                   to_string(int(round(melhor.cc*100))) + " " +
-                   to_string(int(round(melhor.ncc*100)));
-    putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
-            FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+      //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
+      string texto = to_string(melhor.s) + " " +
+                     to_string(int(round(melhor.cc*100))) + " " +
+                     to_string(int(round(melhor.ncc*100)));
+      putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
+              FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+    }
   }
 };
 
@@ -350,13 +309,14 @@ private:
 //    DIGITO digito("quadrado.png", ".");      //le o MNIST e treina (uma vez)
 //    if (digito.le(placa, quadro, quadroCinza)) ...   //a cada quadro
 //    digito.digito                            //o digito lido, 0..9
+//    quadroSaida = digito.desenha(quadro, placa);     //quadro + paineis
 //
 // Os passos sao os da apostila (p. 4):
 //   1)  treino: MNIST (60000 imagens de TREINO) + FLANN       (construtor)
-//   4a) recorta o interior do quadrado amarelo                (recorta)
-//   4b) ajusta brilho/contraste: fundo branco, tinta preta    (ajustaContraste)
-//   4c) mnist.bbox: tira as bordas brancas e reduz a 14x14    (reduz)
-//   4d) FLANN: o rotulo da imagem de treino mais parecida     (classifica)
+//   4a) recorta o interior do quadrado amarelo                (le)
+//   4b) ajusta brilho/contraste: fundo branco, tinta preta    (le)
+//   4c) mnist.bbox: tira as bordas brancas e reduz a 14x14    (le)
+//   4d) FLANN: o rotulo da imagem de treino mais parecida     (le)
 //---------------------------------------------------------------------------
 class DIGITO {
 public:
@@ -401,8 +361,38 @@ public:
   //   true      ajusta o bbox: tira as linhas/colunas brancas da borda
   //=========================================================================
   DIGITO(const string& arqPlaca, const string& dirMnist) : mnist(NLADO, true, true) {
-    achaInterior(arqPlaca);
-    treina(dirMnist);
+    //---- Acha o interior do quadrado amarelo, onde se escreve o digito ----
+    //E' a unica regiao do quadrado.png com pixels EXATAMENTE (255,255,255) -
+    //a mesma que e' "don't care" no detector. Medir no arquivo evita numeros
+    //magicos no codigo (no quadrado.png: linhas e colunas 121 a 279).
+    Mat_<COR> placaCor = imread(arqPlaca, 1);         //[OpenCV] 1 = ler colorida
+    if (placaCor.empty()) erro("Erro leitura "+arqPlaca);   //[raspberry.hpp]
+
+    int cima=placaCor.rows, baixo=-1, esq=placaCor.cols, dir=-1;
+    for (int l=0; l<placaCor.rows; l++)
+      for (int c=0; c<placaCor.cols; c++)
+        if (placaCor(l,c) == COR(255,255,255)) {      //branco puro
+          cima = min(cima, l);  baixo = max(baixo, l);
+          esq  = min(esq, c);   dir   = max(dir, c);
+        }
+    if (baixo<0) erro("Erro: "+arqPlaca+" sem o interior branco (255,255,255)");
+
+    //Rect(coluna do canto, linha do canto, largura, altura)
+    interior = Rect(esq, cima, dir-esq+1, baixo-cima+1);
+    ladoPlaca = placaCor.rows;
+
+    //---- PASSO 1: le o MNIST e treina o FLANN ----
+    //So' as 60000 imagens de TREINO (o 0 pede para nao ler as 10000 de teste):
+    //o conjunto de teste serve para MEDIR o erro de um algoritmo, nao para o
+    //programa final usar.
+    //Depois do le(), mnist.ax tem uma imagem 14x14 por linha (196 colunas,
+    //0=preto 1=branco) e mnist.ay o rotulo de cada uma (0..9).
+    //"Treinar" o FLANN e' so' montar uma arvore de busca sobre as linhas de
+    //mnist.ax, para achar rapido a mais parecida com uma imagem nova.
+    double t0 = timeSinceEpoch();                     //[raspberry.hpp]
+    mnist.le(dirMnist, 60000, 0);                     //[raspberry.hpp] le os arquivos
+    mnist.train();                                    //[raspberry.hpp] arvore do FLANN
+    printf("MNIST lido e FLANN treinado em %.1f s\n", timeSinceEpoch()-t0);
   }
 
   //=========================================================================
@@ -410,6 +400,8 @@ public:
   //   placa:       o detector, ja' com o resultado deste quadro
   //   quadro:      o quadro colorido (para o recorte que vai no video)
   //   quadroCinza: o mesmo quadro em cinza 0..1 (para ler o digito)
+  // Se um passo falha, a funcao devolve false ali mesmo, e as imagens dos
+  // passos seguintes (recorte, ajustada, pequena) ficam como estavam.
   //=========================================================================
   bool le(const PLACA& placa, const Mat_<COR>& quadro, const Mat_<FLT>& quadroCinza) {
     leu = false;
@@ -420,11 +412,95 @@ public:
     if (!placa.achou) return false;
     if (placa.melhor.s > ESCALA_PERTO) return false;
 
-    Mat_<FLT> cinza;
-    if (!recorta(placa.melhor, quadro, quadroCinza, cinza)) return false;   //4a
-    if (!ajustaContraste(cinza)) return false;                              //4b
-    if (!reduz()) return false;                                             //4c
-    digito = classifica();                                                  //4d
+    //---------------------------------------------------------------------
+    // PASSO 4a - recorta o interior do quadrado amarelo, no quadro
+    //---------------------------------------------------------------------
+    //O detector diz onde esta' o CENTRO da placa (cd.l, cd.c) e o lado do
+    //modelo que casou (cd.lado). O modelo e' o quadrado.png (401x401)
+    //reduzido para cd.lado x cd.lado, entao um pixel (y,x) do quadrado.png
+    //cai, no quadro, em:
+    //   canto + (y,x) * k,   com k = cd.lado/401 e canto = centro - (lado-1)/2
+    //(o "(lado-1)/2" e' o mesmo que o matchTemplateSame usa para o centro).
+    //Saida: recorte (colorido, para o video) e cinza (para os proximos passos).
+    const CANDIDATO& cd = placa.melhor;
+    double k = double(cd.lado)/ladoPlaca;            //escala placa -> quadro
+    int cantoL = cd.l - (cd.lado-1)/2;               //canto superior esquerdo
+    int cantoC = cd.c - (cd.lado-1)/2;               //do modelo, no quadro
+    double folga = FOLGA*interior.width;             //em pixels do quadrado.png
+
+    //cantos do interior (menos a folga), convertidos para o quadro
+    int l0 = cantoL + int(round((interior.y + folga)*k));
+    int c0 = cantoC + int(round((interior.x + folga)*k));
+    int l1 = cantoL + int(round((interior.y + interior.height - folga)*k));
+    int c1 = cantoC + int(round((interior.x + interior.width  - folga)*k));
+    Rect r(c0, l0, c1-c0, l1-l0);
+
+    //o recorte tem que estar inteiro dentro do quadro ("&" = intersecao)
+    Rect quadroTodo(0, 0, quadroCinza.cols, quadroCinza.rows);
+    if ((r & quadroTodo) != r) return false;
+    if (r.width<4 || r.height<4) return false;      //pequeno demais para ler
+
+    //clone(): copia de verdade. Sem ele, recorte seria uma "janela" que
+    //aponta para os pixels do quadro, e mudaria quando o quadro mudasse.
+    recorte = quadro(r).clone();                     //[OpenCV]
+    Mat_<FLT> cinza = quadroCinza(r).clone();        //[OpenCV]
+
+    //---------------------------------------------------------------------
+    // PASSO 4b - brilho/contraste: fundo -> branco (1.0), tinta -> preto (0.0)
+    //---------------------------------------------------------------------
+    //No video, o fundo da placa e' cinza claro (nao 1.0) e a tinta cinza
+    //escura (nao 0.0), e os dois mudam com a iluminacao. O MNIST invertido
+    //tem fundo exatamente 1.0. Entao esticamos os tons:
+    //   preto  = o pixel mais escuro do recorte       (a tinta)
+    //   branco = a MEDIANA dos pixels do recorte      (o fundo: a maioria dos
+    //            pixels e' fundo, entao o valor do meio e' um pixel de fundo)
+    //   novo   = (velho - preto)/(branco - preto), cortado em 0..1
+    //Tudo que e' tao claro quanto o fundo vira 1.0 (branco); a tinta vira
+    //0.0; a borda do traco fica cinza, como no MNIST.
+    //mediana: nth_element [C++] poe no meio do vetor o valor que estaria
+    //ali se o vetor fosse ordenado (sem ordenar tudo, mais rapido)
+    vector<FLT> v(cinza.begin(), cinza.end());       //copia os pixels num vetor
+    int meio = int(v.size())/2;
+    nth_element(v.begin(), v.begin()+meio, v.end());
+    FLT branco = v[meio];
+
+    double preto;
+    minMaxLoc(cinza, &preto, NULL);                  //[OpenCV] o menor valor
+
+    if (branco - preto < CONTRASTE_MIN) return false;   //nao tem tinta: placa vazia
+
+    ajustada.create(cinza.rows, cinza.cols);         //[OpenCV] aloca do mesmo tamanho
+    for (int l=0; l<cinza.rows; l++)
+      for (int c=0; c<cinza.cols; c++) {
+        FLT novo = FLT((cinza(l,c) - preto)/(branco - preto));
+        ajustada(l,c) = min(FLT(1), max(FLT(0), novo));   //corta em 0..1
+      }
+
+    //---------------------------------------------------------------------
+    // PASSO 4c - bbox e 14x14, como o MNIST fez com as imagens de treino
+    //---------------------------------------------------------------------
+    //mnist.bbox [raspberry.hpp] (versao FLT):
+    //  - acha as linhas/colunas com algum pixel <= 0.5 (tinta) e corta as
+    //    bordas brancas em volta;
+    //  - redimensiona o que sobrou para 14x14.
+    //Sem isso, um "1" pequeno no canto e um "1" grande no meio seriam imagens
+    //muito diferentes para o FLANN. Se nao achar tinta, mnist.localizou=false.
+    pequena = mnist.bbox(ajustada);                  //[raspberry.hpp]
+    if (!mnist.localizou) return false;
+
+    //---------------------------------------------------------------------
+    // PASSO 4d - FLANN: o vizinho mais proximo
+    //---------------------------------------------------------------------
+    //A consulta tem que ter o mesmo formato de uma linha de mnist.ax: 1 linha
+    //com os 196 pixels (14x14 lidos linha por linha). predictInterno
+    //[raspberry.hpp] acha a imagem de treino mais parecida e devolve o
+    //rotulo dela.
+    //(MnistFlann::predict tambem existiria, mas ele mesmo chama o bbox de
+    //novo; aqui o bbox ja' foi feito no 4c, para podermos mostrar a imagem.)
+    Mat_<FLT> consulta(1, NLADO*NLADO);              //1 linha x 196 colunas
+    for (int i=0; i<NLADO*NLADO; i++)
+      consulta(i) = pequena(i);                      //pequena(i): i-esimo pixel
+    digito = int(mnist.predictInterno(consulta));    //[raspberry.hpp]
     leu = true;
     return true;
   }
@@ -449,199 +525,30 @@ public:
     quadro.copyTo(saida(Rect(0, 0, quadro.cols, quadro.rows)));      //[OpenCV]
     if (!leu) return saida;             //nao leu: os paineis ficam cinzas
 
-    desenhaDigitoAoLado(saida, placa.melhor);
-    desenhaPainelPequena(saida, quadro.cols, 0, lp);
-    desenhaPainelRecorte(saida, quadro.cols, lp, lp);
-    return saida;
-  }
+    const Scalar vermelho(0,0,255);     //cor na ordem B,G,R
 
-private:
-  //=========================================================================
-  // Preparacao (construtor)
-  //=========================================================================
-
-  //Acha o interior do quadrado amarelo, onde se escreve o digito.
-  //E' a unica regiao do quadrado.png com pixels EXATAMENTE (255,255,255) -
-  //a mesma que e' "don't care" no detector. Medir no arquivo evita numeros
-  //magicos no codigo (no quadrado.png: linhas e colunas 121 a 279).
-  void achaInterior(const string& arqPlaca) {
-    Mat_<COR> placaCor = imread(arqPlaca, 1);         //[OpenCV] 1 = ler colorida
-    if (placaCor.empty()) erro("Erro leitura "+arqPlaca);   //[raspberry.hpp]
-
-    int cima=placaCor.rows, baixo=-1, esq=placaCor.cols, dir=-1;
-    for (int l=0; l<placaCor.rows; l++)
-      for (int c=0; c<placaCor.cols; c++)
-        if (placaCor(l,c) == COR(255,255,255)) {      //branco puro
-          cima = min(cima, l);  baixo = max(baixo, l);
-          esq  = min(esq, c);   dir   = max(dir, c);
-        }
-    if (baixo<0) erro("Erro: "+arqPlaca+" sem o interior branco (255,255,255)");
-
-    //Rect(coluna do canto, linha do canto, largura, altura)
-    interior = Rect(esq, cima, dir-esq+1, baixo-cima+1);
-    ladoPlaca = placaCor.rows;
-  }
-
-  //PASSO 1: le o MNIST e treina o FLANN.
-  //So' as 60000 imagens de TREINO (o 0 pede para nao ler as 10000 de teste):
-  //o conjunto de teste serve para MEDIR o erro de um algoritmo, nao para o
-  //programa final usar.
-  //Depois do le(), mnist.ax tem uma imagem 14x14 por linha (196 colunas,
-  //0=preto 1=branco) e mnist.ay o rotulo de cada uma (0..9).
-  //"Treinar" o FLANN e' so' montar uma arvore de busca sobre as linhas de
-  //mnist.ax, para achar rapido a mais parecida com uma imagem nova.
-  void treina(const string& dirMnist) {
-    double t0 = timeSinceEpoch();                     //[raspberry.hpp]
-    mnist.le(dirMnist, 60000, 0);                     //[raspberry.hpp] le os arquivos
-    mnist.train();                                    //[raspberry.hpp] arvore do FLANN
-    printf("MNIST lido e FLANN treinado em %.1f s\n", timeSinceEpoch()-t0);
-  }
-
-  //=========================================================================
-  // PASSO 4a - recorta: o interior do quadrado amarelo, no quadro
-  //=========================================================================
-  //O detector diz onde esta' o CENTRO da placa (cd.l, cd.c) e o lado do
-  //modelo que casou (cd.lado). O modelo e' o quadrado.png (401x401)
-  //reduzido para cd.lado x cd.lado, entao um pixel (y,x) do quadrado.png
-  //cai, no quadro, em:
-  //   canto + (y,x) * k,   com k = cd.lado/401 e canto = centro - (lado-1)/2
-  //(o "(lado-1)/2" e' o mesmo que o matchTemplateSame usa para o centro).
-  //Saida: recorte (colorido, para o video) e cinza (para os proximos passos).
-  bool recorta(const CANDIDATO& cd, const Mat_<COR>& quadro,
-               const Mat_<FLT>& quadroCinza, Mat_<FLT>& cinza) {
-    double k = double(cd.lado)/ladoPlaca;            //escala placa -> quadro
-    int cantoL = cd.l - (cd.lado-1)/2;               //canto superior esquerdo
-    int cantoC = cd.c - (cd.lado-1)/2;               //do modelo, no quadro
-    double folga = FOLGA*interior.width;             //em pixels do quadrado.png
-
-    //cantos do interior (menos a folga), convertidos para o quadro
-    int l0 = cantoL + int(round((interior.y + folga)*k));
-    int c0 = cantoC + int(round((interior.x + folga)*k));
-    int l1 = cantoL + int(round((interior.y + interior.height - folga)*k));
-    int c1 = cantoC + int(round((interior.x + interior.width  - folga)*k));
-    Rect r(c0, l0, c1-c0, l1-l0);
-
-    //o recorte tem que estar inteiro dentro do quadro ("&" = intersecao)
-    Rect quadroTodo(0, 0, quadroCinza.cols, quadroCinza.rows);
-    if ((r & quadroTodo) != r) return false;
-    if (r.width<4 || r.height<4) return false;      //pequeno demais para ler
-
-    //clone(): copia de verdade. Sem ele, recorte seria uma "janela" que
-    //aponta para os pixels do quadro, e mudaria quando o quadro mudasse.
-    recorte = quadro(r).clone();                     //[OpenCV]
-    cinza = quadroCinza(r).clone();                  //[OpenCV]
-    return true;
-  }
-
-  //=========================================================================
-  // PASSO 4b - ajustaContraste: fundo -> branco (1.0), tinta -> preto (0.0)
-  //=========================================================================
-  //No video, o fundo da placa e' cinza claro (nao 1.0) e a tinta cinza
-  //escura (nao 0.0), e os dois mudam com a iluminacao. O MNIST invertido
-  //tem fundo exatamente 1.0. Entao esticamos os tons:
-  //   preto  = o pixel mais escuro do recorte       (a tinta)
-  //   branco = a MEDIANA dos pixels do recorte      (o fundo: a maioria dos
-  //            pixels e' fundo, entao o valor do meio e' um pixel de fundo)
-  //   novo   = (velho - preto)/(branco - preto), cortado em 0..1
-  //Tudo que e' tao claro quanto o fundo vira 1.0 (branco); a tinta vira
-  //0.0; a borda do traco fica cinza, como no MNIST.
-  bool ajustaContraste(const Mat_<FLT>& cinza) {
-    //mediana: nth_element [C++] poe no meio do vetor o valor que estaria
-    //ali se o vetor fosse ordenado (sem ordenar tudo, mais rapido)
-    vector<FLT> v(cinza.begin(), cinza.end());       //copia os pixels num vetor
-    int meio = int(v.size())/2;
-    nth_element(v.begin(), v.begin()+meio, v.end());
-    FLT branco = v[meio];
-
-    double preto;
-    minMaxLoc(cinza, &preto, NULL);                  //[OpenCV] o menor valor
-
-    if (branco - preto < CONTRASTE_MIN) return false;   //nao tem tinta: placa vazia
-
-    ajustada.create(cinza.rows, cinza.cols);         //[OpenCV] aloca do mesmo tamanho
-    for (int l=0; l<cinza.rows; l++)
-      for (int c=0; c<cinza.cols; c++) {
-        FLT novo = FLT((cinza(l,c) - preto)/(branco - preto));
-        ajustada(l,c) = min(FLT(1), max(FLT(0), novo));   //corta em 0..1
-      }
-    return true;
-  }
-
-  //=========================================================================
-  // PASSO 4c - reduz: bbox e 14x14, como o MNIST fez com as imagens de treino
-  //=========================================================================
-  //mnist.bbox [raspberry.hpp] (versao FLT):
-  //  - acha as linhas/colunas com algum pixel <= 0.5 (tinta) e corta as
-  //    bordas brancas em volta;
-  //  - redimensiona o que sobrou para 14x14.
-  //Sem isso, um "1" pequeno no canto e um "1" grande no meio seriam imagens
-  //muito diferentes para o FLANN. Se nao achar tinta, mnist.localizou=false.
-  bool reduz() {
-    pequena = mnist.bbox(ajustada);                  //[raspberry.hpp]
-    return mnist.localizou;
-  }
-
-  //=========================================================================
-  // PASSO 4d - classifica: FLANN, o vizinho mais proximo
-  //=========================================================================
-  //A consulta tem que ter o mesmo formato de uma linha de mnist.ax: 1 linha
-  //com os 196 pixels (14x14 lidos linha por linha). predictInterno
-  //[raspberry.hpp] acha a imagem de treino mais parecida e devolve o
-  //rotulo dela.
-  //(MnistFlann::predict tambem existiria, mas ele mesmo chama o bbox de
-  //novo; aqui o bbox ja' foi feito no 4c, para podermos mostrar a imagem.)
-  int classifica() {
-    Mat_<FLT> consulta(1, NLADO*NLADO);              //1 linha x 196 colunas
-    for (int i=0; i<NLADO*NLADO; i++)
-      consulta(i) = pequena(i);                      //pequena(i): i-esimo pixel
-    return int(mnist.predictInterno(consulta));     //[raspberry.hpp]
-  }
-
-  //=========================================================================
-  // Desenho
-  //=========================================================================
-
-  //O digito lido, grande e vermelho, a esquerda da placa.
-  void desenhaDigitoAoLado(Mat_<COR>& saida, const CANDIDATO& cd) const {
-    const Scalar vermelho(0,0,255);                  //cor na ordem B,G,R
+    //---- O digito lido, grande e vermelho, a esquerda da placa ----
+    const CANDIDATO& cd = placa.melhor;
     Point p(cd.c - cd.lado/2 - 32, cd.l + 16);       //(coluna, linha) do texto
     putText(saida, to_string(digito), p, FONT_HERSHEY_SIMPLEX, 1.4, vermelho, 3);   //[OpenCV]
-  }
 
-  //Painel de cima: a imagem 14x14 ampliada SEM interpolar (INTER_NEAREST),
-  //para ver cada pixel como um quadradinho - e' o que o FLANN recebeu.
-  void desenhaPainelPequena(Mat_<COR>& saida, int c, int l, int lp) const {
+    //---- Painel de cima: a imagem 14x14 ampliada SEM interpolar
+    //(INTER_NEAREST), para ver cada pixel como um quadradinho - e' o que o
+    //FLANN recebeu ----
     Mat_<COR> painel;
     converte(pequena, painel);                       //[raspberry.hpp] FLT 0..1 -> cor
     resize(painel, painel, Size(lp,lp), 0, 0, INTER_NEAREST);    //[OpenCV]
-    painel.copyTo(saida(Rect(c, l, lp, lp)));        //[OpenCV]
-  }
+    painel.copyTo(saida(Rect(quadro.cols, 0, lp, lp)));          //[OpenCV]
 
-  //Painel de baixo: o recorte original do quadro, ampliado, com o digito lido.
-  void desenhaPainelRecorte(Mat_<COR>& saida, int c, int l, int lp) const {
-    const Scalar vermelho(0,0,255);
-    Mat_<COR> painel;
+    //---- Painel de baixo: o recorte original do quadro, ampliado, com o
+    //digito lido ----
     resize(recorte, painel, Size(lp,lp), 0, 0, INTER_LINEAR);   //[OpenCV]
     putText(painel, to_string(digito), Point(lp/2+8, lp-14),
             FONT_HERSHEY_SIMPLEX, 1.6, vermelho, 3);              //[OpenCV]
-    painel.copyTo(saida(Rect(c, l, lp, lp)));        //[OpenCV]
+    painel.copyTo(saida(Rect(quadro.cols, lp, lp, lp)));         //[OpenCV]
+    return saida;
   }
 };
-
-//---------------------------------------------------------------------------
-// achaMnist: o diretorio dos arquivos do MNIST, rodando de aula5/ ou de
-// aula5/tarefa1/ ("." = diretorio atual, ".." = o de cima)
-//---------------------------------------------------------------------------
-string achaMnist() {
-  const char* lugares[2] = { ".", ".." };
-  for (int i=0; i<2; i++) {
-    string arq = string(lugares[i]) + "/train-images.idx3-ubyte";
-    FILE* f = fopen(arq.c_str(), "rb");              //[C] consegue abrir?
-    if (f) { fclose(f); return lugares[i]; }
-  }
-  erro("Erro: nao achei train-images.idx3-ubyte (descompacte o mnist.zip em parte_2/aula5/)");   //[raspberry.hpp]
-  return "";
-}
 
 //#########################################################################
 // PROGRAMA: os passos da apostila (p. 4)
@@ -660,7 +567,17 @@ int main(int argc, char** argv) {
   string arqEntrada = argv[1], arqPlaca = argv[2], arqSaida = argv[3];
 
   //---- PASSO 1: le o MNIST e treina o FLANN; prepara os modelos da placa ----
-  DIGITO digito(arqPlaca, achaMnist());
+  //acha o diretorio dos arquivos do MNIST, rodando de aula5/ ou de
+  //aula5/tarefa1/ ("." = diretorio atual, ".." = o de cima)
+  const char* lugares[2] = { ".", ".." };
+  string dirMnist = "";
+  for (int i=0; i<2 && dirMnist==""; i++) {
+    string arq = string(lugares[i]) + "/train-images.idx3-ubyte";
+    FILE* f = fopen(arq.c_str(), "rb");              //[C] consegue abrir?
+    if (f) { fclose(f); dirMnist = lugares[i]; }
+  }
+  if (dirMnist=="") erro("Erro: nao achei train-images.idx3-ubyte (descompacte o mnist.zip em parte_2/aula5/)");   //[raspberry.hpp]
+  DIGITO digito(arqPlaca, dirMnist);
   PLACA placa(arqPlaca, paralelo);
   printf("%s: localizando com %d thread(s)\n", prog.c_str(), placa.threads());
 

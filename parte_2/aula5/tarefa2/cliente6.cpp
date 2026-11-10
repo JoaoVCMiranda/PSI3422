@@ -6,7 +6,7 @@
 //  DETECTOR DA PLACA    copiado igual do cliente4 (aula 4)
 //  LEITOR DO DIGITO     copiado igual do fase5 (licao #1/2)
 //  MAQUINA DE ESTADOS   o que e' novo: a figura 6 da apostila
-//  TELA E PROGRAMA      mostra, grava e conversa com o servidor6
+//  PROGRAMA             o main: mostra, grava e conversa com o servidor6
 //
 //Arquivos no diretorio de onde o programa roda (parte_2/aula5/):
 //  quadrado.png e os 4 arquivos do mnist.zip
@@ -47,6 +47,7 @@ struct CANDIDATO {
 //    PLACA placa("quadrado.png", paralelo);   //prepara os modelos (uma vez)
 //    if (placa.procura(quadroCinza)) ...      //a cada quadro
 //    placa.melhor.c, placa.melhor.l, ...      //onde achou
+//    placa.desenha(quadro);                   //marca o resultado no quadro
 //---------------------------------------------------------------------------
 class PLACA {
 public:
@@ -95,73 +96,17 @@ public:
     //OpenMP na versao paralela. Assim quem paraleliza e' so' o nosso laco.
     setNumThreads(1);                                 //[OpenCV]
 
-    Mat_<FLT> placaCinza = lePlaca(arqModelo);
-    preparaModelos(placaCinza);
-
-    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
-    mapaCC.resize(NESC);
-    mapaNCC.resize(NESC);
-  }
-
-  int ladoEscala(int s) const { return lado[s]; }
-
-  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
-  int threads() const {
-#ifdef _OPENMP
-    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
-    else return 1;
-#else
-    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
-#endif
-  }
-
-  //=========================================================================
-  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
-  //=========================================================================
-  bool procura(const Mat_<FLT>& f) {
-    calculaMapas(f);                              //PASSO 1 (pesado)
-
-    Mat_<FLT> ccMaximo;      //ccMaximo(l,c)   = maior CC entre as escalas
-    Mat_<int> escalaMaximo;  //escalaMaximo(l,c) = escala que deu esse maior CC
-    maximoEntreEscalas(f.rows, f.cols, ccMaximo, escalaMaximo);   //PASSO 2
-
-    escolheCandidatos(ccMaximo, escalaMaximo);    //PASSO 3
-    escolheMelhor();                              //PASSO 4
-    return achou;
-  }
-
-  //=========================================================================
-  // desenha: marca o resultado no quadro colorido a, como na figura 4:
-  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
-  //   amarelo = a placa encontrada (so' se achou)
-  //=========================================================================
-  void desenha(Mat_<COR>& a) const {
-    for (int k=0; k<(int)candidatos.size(); k++)
-      desenhaCandidato(a, candidatos[k]);
-    if (achou)
-      desenhaMelhor(a);
-  }
-
-private:
-  //=========================================================================
-  // Preparacao (construtor)
-  //=========================================================================
-
-  //Le quadrado.png e converte para niveis de cinza 0..1.
-  //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
-  //que ao virar cinza fica exatamente 1.0 (branco puro).
-  //("static": esta funcao nao usa nenhum campo da classe)
-  static Mat_<FLT> lePlaca(const string& arqModelo) {
+    //---- Le quadrado.png e converte para niveis de cinza 0..1 ----
+    //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
+    //que ao virar cinza fica exatamente 1.0 (branco puro).
     Mat_<COR> placaCor = imread(arqModelo, 1);        //[OpenCV] 1 = ler colorida
     if (placaCor.empty()) erro("Erro leitura "+arqModelo);   //[raspberry.hpp]
     Mat_<FLT> placaCinza;
     converte(placaCor, placaCinza);                   //[raspberry.hpp] cor -> cinza 0..1
-    return placaCinza;
-  }
 
-  //Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os dois
-  //modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC elementos.
-  void preparaModelos(const Mat_<FLT>& placaCinza) {
+    //---- Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os
+    //dois modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC
+    //elementos. ----
     //PROGRESSAO GEOMETRICA: cada escala e' a anterior vezes "razao".
     //Por que nao aritmetica? O tamanho aparente da placa e' inversamente
     //proporcional a distancia. Com razao constante, o salto RELATIVO entre
@@ -199,27 +144,44 @@ private:
 
       lado.push_back(n);
     }
+
+    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
+    mapaCC.resize(NESC);
+    mapaNCC.resize(NESC);
+  }
+
+  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
+  int threads() const {
+#ifdef _OPENMP
+    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
+    else return 1;
+#else
+    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
+#endif
   }
 
   //=========================================================================
-  // PASSO 1 - calculaMapas: os 2*NESC template matchings (parte pesada)
+  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
   //=========================================================================
-  //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
-  //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
-  //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
-  //
-  //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
-  //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
-  //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
-  //#pragma abaixo pede ao OpenMP:
-  //   parallel for      divide as iteracoes do for entre os threads
-  //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
-  //                     (os modelos grandes demoram mais que os pequenos;
-  //                     dividir em blocos fixos deixaria nucleos ociosos)
-  //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
-  //                     fase3p usam EXATAMENTE o mesmo codigo.
-  //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
-  void calculaMapas(const Mat_<FLT>& f) {
+  bool procura(const Mat_<FLT>& f) {
+    //---------------------------------------------------------------------
+    // PASSO 1 - os 2*NESC template matchings (parte pesada)
+    //---------------------------------------------------------------------
+    //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
+    //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
+    //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
+    //
+    //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
+    //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
+    //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
+    //#pragma abaixo pede ao OpenMP:
+    //   parallel for      divide as iteracoes do for entre os threads
+    //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
+    //                     (os modelos grandes demoram mais que os pequenos;
+    //                     dividir em blocos fixos deixaria nucleos ociosos)
+    //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
+    //                     fase3p usam EXATAMENTE o mesmo codigo.
+    //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
     #pragma omp parallel for schedule(dynamic) if(paralelo)
     for (int i=0; i<2*NESC; i++) {
       int s = i/2;                  //escala desta tarefa
@@ -234,35 +196,29 @@ private:
       if (ehCC) mapaCC[s]  = matchTemplateSame(f, modeloCC[s],  CV_TM_CCORR,         0.0);
       else      mapaNCC[s] = matchTemplateSame(f, modeloNCC[s], CV_TM_CCOEFF_NORMED, 0.0);
     }
-  }
 
-  //=========================================================================
-  // PASSO 2 - maximoEntreEscalas: um mapa so', com o melhor CC de cada pixel
-  //=========================================================================
-  //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
-  //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
-  //(ccMaximo e escalaMaximo sao referencias: sao as variaveis do procura())
-  void maximoEntreEscalas(int nl, int nc, Mat_<FLT>& ccMaximo, Mat_<int>& escalaMaximo) const {
-    ccMaximo = mapaCC[0].clone();               //copia de verdade do mapa da escala 0
-    escalaMaximo = Mat_<int>(nl, nc, 0);        //matriz nl x nc de int, toda com 0
-
+    //---------------------------------------------------------------------
+    // PASSO 2 - um mapa so', com o melhor CC de cada pixel
+    //---------------------------------------------------------------------
+    //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
+    //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
+    Mat_<FLT> ccMaximo = mapaCC[0].clone();         //ccMaximo(l,c) = maior CC entre as escalas
+    Mat_<int> escalaMaximo(f.rows, f.cols, 0);      //escalaMaximo(l,c) = escala desse maior CC
     for (int s=1; s<NESC; s++)
-      for (int l=0; l<nl; l++)
-        for (int c=0; c<nc; c++)
+      for (int l=0; l<f.rows; l++)
+        for (int c=0; c<f.cols; c++)
           if (mapaCC[s](l,c) > ccMaximo(l,c)) {
             ccMaximo(l,c) = mapaCC[s](l,c);
             escalaMaximo(l,c) = s;
           }
-  }
 
-  //=========================================================================
-  // PASSO 3 - escolheCandidatos: os NCAND maiores picos de CC
-  //=========================================================================
-  //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
-  //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
-  //maiores valores seriam todos pixels vizinhos do MESMO pico.
-  //ATENCAO: altera ccMaximo (por isso ele e' uma copia, feita no PASSO 2).
-  void escolheCandidatos(Mat_<FLT>& ccMaximo, const Mat_<int>& escalaMaximo) {
+    //---------------------------------------------------------------------
+    // PASSO 3 - os NCAND maiores picos de CC
+    //---------------------------------------------------------------------
+    //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
+    //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
+    //maiores valores seriam todos pixels vizinhos do MESMO pico.
+    //(Por isso o ccMaximo e' uma copia, feita no PASSO 2: aqui ele e' alterado.)
     candidatos.clear();                         //esvazia o array do quadro anterior
     for (int k=0; k<NCAND; k++) {
       //minMaxLoc [OpenCV]: varre a imagem e devolve o maior valor (vmax) e
@@ -288,12 +244,10 @@ private:
         for (int c=cIni; c<=cFim; c++)
           ccMaximo(l,c) = -1;
     }
-  }
 
-  //=========================================================================
-  // PASSO 4 - escolheMelhor: o candidato de maior NCC, se passar do limiar
-  //=========================================================================
-  void escolheMelhor() {
+    //---------------------------------------------------------------------
+    // PASSO 4 - o candidato de maior NCC, se passar do limiar
+    //---------------------------------------------------------------------
     achou = false;
     for (int k=0; k<(int)candidatos.size(); k++) {
       bool primeiro = !achou;
@@ -305,41 +259,46 @@ private:
     //Ate' aqui "achou" so' quer dizer "havia pelo menos um candidato".
     //Agora a decisao de verdade: o NCC tem que ser alto o bastante.
     if (achou && melhor.ncc < LIMIAR_NCC) achou = false;
+    return achou;
   }
 
   //=========================================================================
-  // Desenho
+  // desenha: marca o resultado no quadro colorido a, como na figura 4:
+  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
+  //   amarelo = a placa encontrada (so' se achou)
   //=========================================================================
+  void desenha(Mat_<COR>& a) const {
+    //---- Cada candidato: quadrado ciano + 3 numeros empilhados a direita ----
+    const Scalar ciano(255,255,0);         //cor na ordem B,G,R
+    for (int k=0; k<(int)candidatos.size(); k++) {
+      const CANDIDATO& cd = candidatos[k];
+      int metade = cd.lado/2;
+      //Rect(coluna do canto, linha do canto, largura, altura)
+      rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
 
-  //Quadrado ciano + 3 numeros empilhados a direita: escala, CC x100, NCC x100.
-  static void desenhaCandidato(Mat_<COR>& a, const CANDIDATO& cd) {
-    const Scalar ciano(255,255,0);       //cor na ordem B,G,R
-    int metade = cd.lado/2;
-    //Rect(coluna do canto, linha do canto, largura, altura)
-    rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
-
-    int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
-    int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
-    int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
-    for (int k=0; k<3; k++) {
-      //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
-      putText(a, to_string(numeros[k]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
-      y += 8;                            //proxima linha
+      int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
+      int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
+      int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
+      for (int j=0; j<3; j++) {
+        //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
+        putText(a, to_string(numeros[j]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
+        y += 8;                            //proxima linha
+      }
     }
-  }
 
-  //Quadrado amarelo (mais grosso) + "escala CC NCC" acima dele.
-  void desenhaMelhor(Mat_<COR>& a) const {
-    const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
-    int metade = melhor.lado/2;
-    rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
+    //---- A placa encontrada: quadrado amarelo (mais grosso) + "escala CC NCC" ----
+    if (achou) {
+      const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
+      int metade = melhor.lado/2;
+      rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
 
-    //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
-    string texto = to_string(melhor.s) + " " +
-                   to_string(int(round(melhor.cc*100))) + " " +
-                   to_string(int(round(melhor.ncc*100)));
-    putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
-            FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+      //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
+      string texto = to_string(melhor.s) + " " +
+                     to_string(int(round(melhor.cc*100))) + " " +
+                     to_string(int(round(melhor.ncc*100)));
+      putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
+              FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+    }
   }
 };
 
@@ -352,13 +311,14 @@ private:
 //    DIGITO digito("quadrado.png", ".");      //le o MNIST e treina (uma vez)
 //    if (digito.le(placa, quadro, quadroCinza)) ...   //a cada quadro
 //    digito.digito                            //o digito lido, 0..9
+//    quadroSaida = digito.desenha(quadro, placa);     //quadro + paineis
 //
 // Os passos sao os da apostila (p. 4):
 //   1)  treino: MNIST (60000 imagens de TREINO) + FLANN       (construtor)
-//   4a) recorta o interior do quadrado amarelo                (recorta)
-//   4b) ajusta brilho/contraste: fundo branco, tinta preta    (ajustaContraste)
-//   4c) mnist.bbox: tira as bordas brancas e reduz a 14x14    (reduz)
-//   4d) FLANN: o rotulo da imagem de treino mais parecida     (classifica)
+//   4a) recorta o interior do quadrado amarelo                (le)
+//   4b) ajusta brilho/contraste: fundo branco, tinta preta    (le)
+//   4c) mnist.bbox: tira as bordas brancas e reduz a 14x14    (le)
+//   4d) FLANN: o rotulo da imagem de treino mais parecida     (le)
 //---------------------------------------------------------------------------
 class DIGITO {
 public:
@@ -403,8 +363,38 @@ public:
   //   true      ajusta o bbox: tira as linhas/colunas brancas da borda
   //=========================================================================
   DIGITO(const string& arqPlaca, const string& dirMnist) : mnist(NLADO, true, true) {
-    achaInterior(arqPlaca);
-    treina(dirMnist);
+    //---- Acha o interior do quadrado amarelo, onde se escreve o digito ----
+    //E' a unica regiao do quadrado.png com pixels EXATAMENTE (255,255,255) -
+    //a mesma que e' "don't care" no detector. Medir no arquivo evita numeros
+    //magicos no codigo (no quadrado.png: linhas e colunas 121 a 279).
+    Mat_<COR> placaCor = imread(arqPlaca, 1);         //[OpenCV] 1 = ler colorida
+    if (placaCor.empty()) erro("Erro leitura "+arqPlaca);   //[raspberry.hpp]
+
+    int cima=placaCor.rows, baixo=-1, esq=placaCor.cols, dir=-1;
+    for (int l=0; l<placaCor.rows; l++)
+      for (int c=0; c<placaCor.cols; c++)
+        if (placaCor(l,c) == COR(255,255,255)) {      //branco puro
+          cima = min(cima, l);  baixo = max(baixo, l);
+          esq  = min(esq, c);   dir   = max(dir, c);
+        }
+    if (baixo<0) erro("Erro: "+arqPlaca+" sem o interior branco (255,255,255)");
+
+    //Rect(coluna do canto, linha do canto, largura, altura)
+    interior = Rect(esq, cima, dir-esq+1, baixo-cima+1);
+    ladoPlaca = placaCor.rows;
+
+    //---- PASSO 1: le o MNIST e treina o FLANN ----
+    //So' as 60000 imagens de TREINO (o 0 pede para nao ler as 10000 de teste):
+    //o conjunto de teste serve para MEDIR o erro de um algoritmo, nao para o
+    //programa final usar.
+    //Depois do le(), mnist.ax tem uma imagem 14x14 por linha (196 colunas,
+    //0=preto 1=branco) e mnist.ay o rotulo de cada uma (0..9).
+    //"Treinar" o FLANN e' so' montar uma arvore de busca sobre as linhas de
+    //mnist.ax, para achar rapido a mais parecida com uma imagem nova.
+    double t0 = timeSinceEpoch();                     //[raspberry.hpp]
+    mnist.le(dirMnist, 60000, 0);                     //[raspberry.hpp] le os arquivos
+    mnist.train();                                    //[raspberry.hpp] arvore do FLANN
+    printf("MNIST lido e FLANN treinado em %.1f s\n", timeSinceEpoch()-t0);
   }
 
   //=========================================================================
@@ -412,6 +402,8 @@ public:
   //   placa:       o detector, ja' com o resultado deste quadro
   //   quadro:      o quadro colorido (para o recorte que vai no video)
   //   quadroCinza: o mesmo quadro em cinza 0..1 (para ler o digito)
+  // Se um passo falha, a funcao devolve false ali mesmo, e as imagens dos
+  // passos seguintes (recorte, ajustada, pequena) ficam como estavam.
   //=========================================================================
   bool le(const PLACA& placa, const Mat_<COR>& quadro, const Mat_<FLT>& quadroCinza) {
     leu = false;
@@ -422,11 +414,95 @@ public:
     if (!placa.achou) return false;
     if (placa.melhor.s > ESCALA_PERTO) return false;
 
-    Mat_<FLT> cinza;
-    if (!recorta(placa.melhor, quadro, quadroCinza, cinza)) return false;   //4a
-    if (!ajustaContraste(cinza)) return false;                              //4b
-    if (!reduz()) return false;                                             //4c
-    digito = classifica();                                                  //4d
+    //---------------------------------------------------------------------
+    // PASSO 4a - recorta o interior do quadrado amarelo, no quadro
+    //---------------------------------------------------------------------
+    //O detector diz onde esta' o CENTRO da placa (cd.l, cd.c) e o lado do
+    //modelo que casou (cd.lado). O modelo e' o quadrado.png (401x401)
+    //reduzido para cd.lado x cd.lado, entao um pixel (y,x) do quadrado.png
+    //cai, no quadro, em:
+    //   canto + (y,x) * k,   com k = cd.lado/401 e canto = centro - (lado-1)/2
+    //(o "(lado-1)/2" e' o mesmo que o matchTemplateSame usa para o centro).
+    //Saida: recorte (colorido, para o video) e cinza (para os proximos passos).
+    const CANDIDATO& cd = placa.melhor;
+    double k = double(cd.lado)/ladoPlaca;            //escala placa -> quadro
+    int cantoL = cd.l - (cd.lado-1)/2;               //canto superior esquerdo
+    int cantoC = cd.c - (cd.lado-1)/2;               //do modelo, no quadro
+    double folga = FOLGA*interior.width;             //em pixels do quadrado.png
+
+    //cantos do interior (menos a folga), convertidos para o quadro
+    int l0 = cantoL + int(round((interior.y + folga)*k));
+    int c0 = cantoC + int(round((interior.x + folga)*k));
+    int l1 = cantoL + int(round((interior.y + interior.height - folga)*k));
+    int c1 = cantoC + int(round((interior.x + interior.width  - folga)*k));
+    Rect r(c0, l0, c1-c0, l1-l0);
+
+    //o recorte tem que estar inteiro dentro do quadro ("&" = intersecao)
+    Rect quadroTodo(0, 0, quadroCinza.cols, quadroCinza.rows);
+    if ((r & quadroTodo) != r) return false;
+    if (r.width<4 || r.height<4) return false;      //pequeno demais para ler
+
+    //clone(): copia de verdade. Sem ele, recorte seria uma "janela" que
+    //aponta para os pixels do quadro, e mudaria quando o quadro mudasse.
+    recorte = quadro(r).clone();                     //[OpenCV]
+    Mat_<FLT> cinza = quadroCinza(r).clone();        //[OpenCV]
+
+    //---------------------------------------------------------------------
+    // PASSO 4b - brilho/contraste: fundo -> branco (1.0), tinta -> preto (0.0)
+    //---------------------------------------------------------------------
+    //No video, o fundo da placa e' cinza claro (nao 1.0) e a tinta cinza
+    //escura (nao 0.0), e os dois mudam com a iluminacao. O MNIST invertido
+    //tem fundo exatamente 1.0. Entao esticamos os tons:
+    //   preto  = o pixel mais escuro do recorte       (a tinta)
+    //   branco = a MEDIANA dos pixels do recorte      (o fundo: a maioria dos
+    //            pixels e' fundo, entao o valor do meio e' um pixel de fundo)
+    //   novo   = (velho - preto)/(branco - preto), cortado em 0..1
+    //Tudo que e' tao claro quanto o fundo vira 1.0 (branco); a tinta vira
+    //0.0; a borda do traco fica cinza, como no MNIST.
+    //mediana: nth_element [C++] poe no meio do vetor o valor que estaria
+    //ali se o vetor fosse ordenado (sem ordenar tudo, mais rapido)
+    vector<FLT> v(cinza.begin(), cinza.end());       //copia os pixels num vetor
+    int meio = int(v.size())/2;
+    nth_element(v.begin(), v.begin()+meio, v.end());
+    FLT branco = v[meio];
+
+    double preto;
+    minMaxLoc(cinza, &preto, NULL);                  //[OpenCV] o menor valor
+
+    if (branco - preto < CONTRASTE_MIN) return false;   //nao tem tinta: placa vazia
+
+    ajustada.create(cinza.rows, cinza.cols);         //[OpenCV] aloca do mesmo tamanho
+    for (int l=0; l<cinza.rows; l++)
+      for (int c=0; c<cinza.cols; c++) {
+        FLT novo = FLT((cinza(l,c) - preto)/(branco - preto));
+        ajustada(l,c) = min(FLT(1), max(FLT(0), novo));   //corta em 0..1
+      }
+
+    //---------------------------------------------------------------------
+    // PASSO 4c - bbox e 14x14, como o MNIST fez com as imagens de treino
+    //---------------------------------------------------------------------
+    //mnist.bbox [raspberry.hpp] (versao FLT):
+    //  - acha as linhas/colunas com algum pixel <= 0.5 (tinta) e corta as
+    //    bordas brancas em volta;
+    //  - redimensiona o que sobrou para 14x14.
+    //Sem isso, um "1" pequeno no canto e um "1" grande no meio seriam imagens
+    //muito diferentes para o FLANN. Se nao achar tinta, mnist.localizou=false.
+    pequena = mnist.bbox(ajustada);                  //[raspberry.hpp]
+    if (!mnist.localizou) return false;
+
+    //---------------------------------------------------------------------
+    // PASSO 4d - FLANN: o vizinho mais proximo
+    //---------------------------------------------------------------------
+    //A consulta tem que ter o mesmo formato de uma linha de mnist.ax: 1 linha
+    //com os 196 pixels (14x14 lidos linha por linha). predictInterno
+    //[raspberry.hpp] acha a imagem de treino mais parecida e devolve o
+    //rotulo dela.
+    //(MnistFlann::predict tambem existiria, mas ele mesmo chama o bbox de
+    //novo; aqui o bbox ja' foi feito no 4c, para podermos mostrar a imagem.)
+    Mat_<FLT> consulta(1, NLADO*NLADO);              //1 linha x 196 colunas
+    for (int i=0; i<NLADO*NLADO; i++)
+      consulta(i) = pequena(i);                      //pequena(i): i-esimo pixel
+    digito = int(mnist.predictInterno(consulta));    //[raspberry.hpp]
     leu = true;
     return true;
   }
@@ -451,199 +527,30 @@ public:
     quadro.copyTo(saida(Rect(0, 0, quadro.cols, quadro.rows)));      //[OpenCV]
     if (!leu) return saida;             //nao leu: os paineis ficam cinzas
 
-    desenhaDigitoAoLado(saida, placa.melhor);
-    desenhaPainelPequena(saida, quadro.cols, 0, lp);
-    desenhaPainelRecorte(saida, quadro.cols, lp, lp);
-    return saida;
-  }
+    const Scalar vermelho(0,0,255);     //cor na ordem B,G,R
 
-private:
-  //=========================================================================
-  // Preparacao (construtor)
-  //=========================================================================
-
-  //Acha o interior do quadrado amarelo, onde se escreve o digito.
-  //E' a unica regiao do quadrado.png com pixels EXATAMENTE (255,255,255) -
-  //a mesma que e' "don't care" no detector. Medir no arquivo evita numeros
-  //magicos no codigo (no quadrado.png: linhas e colunas 121 a 279).
-  void achaInterior(const string& arqPlaca) {
-    Mat_<COR> placaCor = imread(arqPlaca, 1);         //[OpenCV] 1 = ler colorida
-    if (placaCor.empty()) erro("Erro leitura "+arqPlaca);   //[raspberry.hpp]
-
-    int cima=placaCor.rows, baixo=-1, esq=placaCor.cols, dir=-1;
-    for (int l=0; l<placaCor.rows; l++)
-      for (int c=0; c<placaCor.cols; c++)
-        if (placaCor(l,c) == COR(255,255,255)) {      //branco puro
-          cima = min(cima, l);  baixo = max(baixo, l);
-          esq  = min(esq, c);   dir   = max(dir, c);
-        }
-    if (baixo<0) erro("Erro: "+arqPlaca+" sem o interior branco (255,255,255)");
-
-    //Rect(coluna do canto, linha do canto, largura, altura)
-    interior = Rect(esq, cima, dir-esq+1, baixo-cima+1);
-    ladoPlaca = placaCor.rows;
-  }
-
-  //PASSO 1: le o MNIST e treina o FLANN.
-  //So' as 60000 imagens de TREINO (o 0 pede para nao ler as 10000 de teste):
-  //o conjunto de teste serve para MEDIR o erro de um algoritmo, nao para o
-  //programa final usar.
-  //Depois do le(), mnist.ax tem uma imagem 14x14 por linha (196 colunas,
-  //0=preto 1=branco) e mnist.ay o rotulo de cada uma (0..9).
-  //"Treinar" o FLANN e' so' montar uma arvore de busca sobre as linhas de
-  //mnist.ax, para achar rapido a mais parecida com uma imagem nova.
-  void treina(const string& dirMnist) {
-    double t0 = timeSinceEpoch();                     //[raspberry.hpp]
-    mnist.le(dirMnist, 60000, 0);                     //[raspberry.hpp] le os arquivos
-    mnist.train();                                    //[raspberry.hpp] arvore do FLANN
-    printf("MNIST lido e FLANN treinado em %.1f s\n", timeSinceEpoch()-t0);
-  }
-
-  //=========================================================================
-  // PASSO 4a - recorta: o interior do quadrado amarelo, no quadro
-  //=========================================================================
-  //O detector diz onde esta' o CENTRO da placa (cd.l, cd.c) e o lado do
-  //modelo que casou (cd.lado). O modelo e' o quadrado.png (401x401)
-  //reduzido para cd.lado x cd.lado, entao um pixel (y,x) do quadrado.png
-  //cai, no quadro, em:
-  //   canto + (y,x) * k,   com k = cd.lado/401 e canto = centro - (lado-1)/2
-  //(o "(lado-1)/2" e' o mesmo que o matchTemplateSame usa para o centro).
-  //Saida: recorte (colorido, para o video) e cinza (para os proximos passos).
-  bool recorta(const CANDIDATO& cd, const Mat_<COR>& quadro,
-               const Mat_<FLT>& quadroCinza, Mat_<FLT>& cinza) {
-    double k = double(cd.lado)/ladoPlaca;            //escala placa -> quadro
-    int cantoL = cd.l - (cd.lado-1)/2;               //canto superior esquerdo
-    int cantoC = cd.c - (cd.lado-1)/2;               //do modelo, no quadro
-    double folga = FOLGA*interior.width;             //em pixels do quadrado.png
-
-    //cantos do interior (menos a folga), convertidos para o quadro
-    int l0 = cantoL + int(round((interior.y + folga)*k));
-    int c0 = cantoC + int(round((interior.x + folga)*k));
-    int l1 = cantoL + int(round((interior.y + interior.height - folga)*k));
-    int c1 = cantoC + int(round((interior.x + interior.width  - folga)*k));
-    Rect r(c0, l0, c1-c0, l1-l0);
-
-    //o recorte tem que estar inteiro dentro do quadro ("&" = intersecao)
-    Rect quadroTodo(0, 0, quadroCinza.cols, quadroCinza.rows);
-    if ((r & quadroTodo) != r) return false;
-    if (r.width<4 || r.height<4) return false;      //pequeno demais para ler
-
-    //clone(): copia de verdade. Sem ele, recorte seria uma "janela" que
-    //aponta para os pixels do quadro, e mudaria quando o quadro mudasse.
-    recorte = quadro(r).clone();                     //[OpenCV]
-    cinza = quadroCinza(r).clone();                  //[OpenCV]
-    return true;
-  }
-
-  //=========================================================================
-  // PASSO 4b - ajustaContraste: fundo -> branco (1.0), tinta -> preto (0.0)
-  //=========================================================================
-  //No video, o fundo da placa e' cinza claro (nao 1.0) e a tinta cinza
-  //escura (nao 0.0), e os dois mudam com a iluminacao. O MNIST invertido
-  //tem fundo exatamente 1.0. Entao esticamos os tons:
-  //   preto  = o pixel mais escuro do recorte       (a tinta)
-  //   branco = a MEDIANA dos pixels do recorte      (o fundo: a maioria dos
-  //            pixels e' fundo, entao o valor do meio e' um pixel de fundo)
-  //   novo   = (velho - preto)/(branco - preto), cortado em 0..1
-  //Tudo que e' tao claro quanto o fundo vira 1.0 (branco); a tinta vira
-  //0.0; a borda do traco fica cinza, como no MNIST.
-  bool ajustaContraste(const Mat_<FLT>& cinza) {
-    //mediana: nth_element [C++] poe no meio do vetor o valor que estaria
-    //ali se o vetor fosse ordenado (sem ordenar tudo, mais rapido)
-    vector<FLT> v(cinza.begin(), cinza.end());       //copia os pixels num vetor
-    int meio = int(v.size())/2;
-    nth_element(v.begin(), v.begin()+meio, v.end());
-    FLT branco = v[meio];
-
-    double preto;
-    minMaxLoc(cinza, &preto, NULL);                  //[OpenCV] o menor valor
-
-    if (branco - preto < CONTRASTE_MIN) return false;   //nao tem tinta: placa vazia
-
-    ajustada.create(cinza.rows, cinza.cols);         //[OpenCV] aloca do mesmo tamanho
-    for (int l=0; l<cinza.rows; l++)
-      for (int c=0; c<cinza.cols; c++) {
-        FLT novo = FLT((cinza(l,c) - preto)/(branco - preto));
-        ajustada(l,c) = min(FLT(1), max(FLT(0), novo));   //corta em 0..1
-      }
-    return true;
-  }
-
-  //=========================================================================
-  // PASSO 4c - reduz: bbox e 14x14, como o MNIST fez com as imagens de treino
-  //=========================================================================
-  //mnist.bbox [raspberry.hpp] (versao FLT):
-  //  - acha as linhas/colunas com algum pixel <= 0.5 (tinta) e corta as
-  //    bordas brancas em volta;
-  //  - redimensiona o que sobrou para 14x14.
-  //Sem isso, um "1" pequeno no canto e um "1" grande no meio seriam imagens
-  //muito diferentes para o FLANN. Se nao achar tinta, mnist.localizou=false.
-  bool reduz() {
-    pequena = mnist.bbox(ajustada);                  //[raspberry.hpp]
-    return mnist.localizou;
-  }
-
-  //=========================================================================
-  // PASSO 4d - classifica: FLANN, o vizinho mais proximo
-  //=========================================================================
-  //A consulta tem que ter o mesmo formato de uma linha de mnist.ax: 1 linha
-  //com os 196 pixels (14x14 lidos linha por linha). predictInterno
-  //[raspberry.hpp] acha a imagem de treino mais parecida e devolve o
-  //rotulo dela.
-  //(MnistFlann::predict tambem existiria, mas ele mesmo chama o bbox de
-  //novo; aqui o bbox ja' foi feito no 4c, para podermos mostrar a imagem.)
-  int classifica() {
-    Mat_<FLT> consulta(1, NLADO*NLADO);              //1 linha x 196 colunas
-    for (int i=0; i<NLADO*NLADO; i++)
-      consulta(i) = pequena(i);                      //pequena(i): i-esimo pixel
-    return int(mnist.predictInterno(consulta));     //[raspberry.hpp]
-  }
-
-  //=========================================================================
-  // Desenho
-  //=========================================================================
-
-  //O digito lido, grande e vermelho, a esquerda da placa.
-  void desenhaDigitoAoLado(Mat_<COR>& saida, const CANDIDATO& cd) const {
-    const Scalar vermelho(0,0,255);                  //cor na ordem B,G,R
+    //---- O digito lido, grande e vermelho, a esquerda da placa ----
+    const CANDIDATO& cd = placa.melhor;
     Point p(cd.c - cd.lado/2 - 32, cd.l + 16);       //(coluna, linha) do texto
     putText(saida, to_string(digito), p, FONT_HERSHEY_SIMPLEX, 1.4, vermelho, 3);   //[OpenCV]
-  }
 
-  //Painel de cima: a imagem 14x14 ampliada SEM interpolar (INTER_NEAREST),
-  //para ver cada pixel como um quadradinho - e' o que o FLANN recebeu.
-  void desenhaPainelPequena(Mat_<COR>& saida, int c, int l, int lp) const {
+    //---- Painel de cima: a imagem 14x14 ampliada SEM interpolar
+    //(INTER_NEAREST), para ver cada pixel como um quadradinho - e' o que o
+    //FLANN recebeu ----
     Mat_<COR> painel;
     converte(pequena, painel);                       //[raspberry.hpp] FLT 0..1 -> cor
     resize(painel, painel, Size(lp,lp), 0, 0, INTER_NEAREST);    //[OpenCV]
-    painel.copyTo(saida(Rect(c, l, lp, lp)));        //[OpenCV]
-  }
+    painel.copyTo(saida(Rect(quadro.cols, 0, lp, lp)));          //[OpenCV]
 
-  //Painel de baixo: o recorte original do quadro, ampliado, com o digito lido.
-  void desenhaPainelRecorte(Mat_<COR>& saida, int c, int l, int lp) const {
-    const Scalar vermelho(0,0,255);
-    Mat_<COR> painel;
+    //---- Painel de baixo: o recorte original do quadro, ampliado, com o
+    //digito lido ----
     resize(recorte, painel, Size(lp,lp), 0, 0, INTER_LINEAR);   //[OpenCV]
     putText(painel, to_string(digito), Point(lp/2+8, lp-14),
             FONT_HERSHEY_SIMPLEX, 1.6, vermelho, 3);              //[OpenCV]
-    painel.copyTo(saida(Rect(c, l, lp, lp)));        //[OpenCV]
+    painel.copyTo(saida(Rect(quadro.cols, lp, lp, lp)));         //[OpenCV]
+    return saida;
   }
 };
-
-//---------------------------------------------------------------------------
-// achaMnist: o diretorio dos arquivos do MNIST, rodando de aula5/ ou de
-// aula5/tarefa2/ ("." = diretorio atual, ".." = o de cima)
-//---------------------------------------------------------------------------
-string achaMnist() {
-  const char* lugares[2] = { ".", ".." };
-  for (int i=0; i<2; i++) {
-    string arq = string(lugares[i]) + "/train-images.idx3-ubyte";
-    FILE* f = fopen(arq.c_str(), "rb");              //[C] consegue abrir?
-    if (f) { fclose(f); return lugares[i]; }
-  }
-  erro("Erro: nao achei train-images.idx3-ubyte (descompacte o mnist.zip em parte_2/aula5/)");   //[raspberry.hpp]
-  return "";
-}
 
 //#########################################################################
 // MAQUINA DE ESTADOS (novo na fase 6) - figura 6 da apostila
@@ -750,28 +657,9 @@ struct MOVIMENTO {
 };
 
 //---------------------------------------------------------------------------
-// movimentoDoDigito: a tabela de comandos da apostila (2025, p. 5).
-//   0 ou 1  pare (nao chega aqui: o estado 2 vai direto para o 4 FIM)
-//   2       vire 180 graus a esquerda      3       vire 180 graus a direita
-//   4 ou 5  passe por baixo da placa e continue em frente
-//   6 ou 7  vire 90 graus a esquerda       8 ou 9  vire 90 graus a direita
-// Girar no proprio eixo: uma roda para frente e a outra para tras.
-//   esquerda: esq = -GIRO, dir = +GIRO      direita: esq = +GIRO, dir = -GIRO
-//---------------------------------------------------------------------------
-MOVIMENTO movimentoDoDigito(int d) {
-  MOVIMENTO m;
-  if (d==2)             m = { -GIRO,  GIRO,     TEMPO_180,   "180 graus a esquerda" };
-  else if (d==3)        m = {  GIRO, -GIRO,     TEMPO_180,   "180 graus a direita" };
-  else if (d==4 || d==5) m = { VEL_PASSA, VEL_PASSA, TEMPO_PASSA, "passa por baixo" };
-  else if (d==6 || d==7) m = { -GIRO,  GIRO,     TEMPO_90,    "90 graus a esquerda" };
-  else                  m = {  GIRO, -GIRO,     TEMPO_90,    "90 graus a direita" };   //8 ou 9
-  return m;
-}
-
-//---------------------------------------------------------------------------
 // MAQUINA: a maquina de estados. Uso, a cada quadro:
 //    maquina.passo(placa, digito);   //anda um passo
-//    maquina.esq, maquina.dir        //velocidade para mandar ao servidor6
+//    maquina.esq, maquina.dir        //velocidade para mandar ao servidor
 //    maquina.estado                  //o estado atual (para a tela)
 //---------------------------------------------------------------------------
 class MAQUINA {
@@ -783,12 +671,20 @@ public:
   int digitoLido = -1;     //o digito decidido no estado 2
 
 private:
-  double inicioEstado;     //quando entrou no estado atual [segundos]
+  double inicioEstado;     //quando entrou no estado atual [segundos] (o "cronometro")
   double ultimaPlaca;      //estado 4: quando viu a placa pela ultima vez [segundos]
   MOVIMENTO movimento;     //o movimento do estado 3
   int votos[10];           //estado 2: votos[d] = quantas leituras deram d
   int leituras;            //estado 2: quantas leituras ja' juntou
   int tentativas;          //estado 2: quantos quadros ja' tentou
+
+  //Muda de estado, zera o cronometro e avisa no terminal (para depurar).
+  //(Definido antes do passo(), que e' quem o usa.)
+  void vaiPara(ESTADO novo, const string& motivo) {
+    printf("estado %-9s -> %-9s  (%s)\n", NOME_ESTADO[estado], NOME_ESTADO[novo], motivo.c_str());
+    estado = novo;
+    inicioEstado = timeSinceEpoch();
+  }
 
 public:
   MAQUINA() {
@@ -799,249 +695,174 @@ public:
   // passo: executa o estado atual UMA vez (um quadro).
   // Comeca com as rodas paradas: so' os estados 0 e 3 as ligam. Assim
   // nenhum estado esquece os motores ligados por engano.
+  // Um bloco por estado, encadeados com "else if": se um estado muda o
+  // "estado", o novo so' roda no PROXIMO quadro.
   //=========================================================================
   void passo(const PLACA& placa, const DIGITO& digito) {
     esq = 0;
     dir = 0;
-    if      (estado == SEGUE)   estado0_segue(placa);
-    else if (estado == PARA)    estado1_para();
-    else if (estado == LE)      estado2_le(digito);
-    else if (estado == MOVE)    estado3_move();
-    else if (estado == FIM)     estado4_fim(placa);
-    else if (estado == TERMINA) estado5_termina();
-  }
 
-  //Segundos desde que entrou no estado atual (o "cronometro").
-  double tempoNoEstado() const {
-    return timeSinceEpoch() - inicioEstado;   //[raspberry.hpp]
-  }
-
-private:
-  //Muda de estado, zera o cronometro e avisa no terminal (para depurar).
-  void vaiPara(ESTADO novo, const string& motivo) {
-    printf("estado %-9s -> %-9s  (%s)\n", NOME_ESTADO[estado], NOME_ESTADO[novo], motivo.c_str());
-    estado = novo;
-    inicioEstado = timeSinceEpoch();
-  }
-
-  //=========================================================================
-  // Estado 0 - SEGUE: detecta e segue a placa (o mesmo controle da fase 4).
-  //   sem placa      -> parado, continua no 0
-  //   placa pequena  -> anda na direcao dela
-  //   placa grande   -> vai para o 1 (parar antes de bater)
-  //=========================================================================
-  void estado0_segue(const PLACA& placa) {
-    if (!placa.achou) {
-      info = "sem placa";
-      return;                              //rodas paradas
-    }
-    if (placa.melhor.lado >= LADO_PERTO) {
-      info = "placa perto";
-      vaiPara(PARA, "placa grande: para para ler");
-      return;                              //rodas paradas
-    }
-    //desvio: -1 com a placa na borda esquerda, 0 no centro, +1 na direita
-    double centro = 320/2.0;
-    double desvio = (placa.melhor.c - centro)/centro;
-    //placa a direita (desvio>0): esquerda acelera, direita freia -> vira a direita
-    esq = max(-1.0, min(VEL + GANHO*desvio, 1.0));
-    dir = max(-1.0, min(VEL - GANHO*desvio, 1.0));
-    info = "dirx=" + to_string(int(round(100*desvio)));   //como na figura 7
-  }
-
-  //=========================================================================
-  // Estado 1 - PARA: motores desligados ate' o carrinho parar de vez.
-  // Pela inercia, ele ainda anda um pouco; ler o digito agora daria uma
-  // imagem borrada (figura 8).
-  //=========================================================================
-  void estado1_para() {
-    info = "parando";
-    if (tempoNoEstado() >= TEMPO_PARADA) {
-      comecaLeitura();
-      vaiPara(LE, "carrinho parado");
-    }
-  }
-
-  //=========================================================================
-  // Estado 2 - LE: le o digito com o carrinho parado (figura 9).
-  // Uma leitura erra de vez em quando (1% no capturado.avi, ver
-  // ../tarefa1); um erro aqui faria o carrinho virar para o lado errado.
-  // Entao juntamos VOTOS leituras e vence o digito mais lido (maioria).
-  //   VOTOS leituras: 0 ou 1 -> 4 FIM (para);  2..9 -> 3 MOVE
-  //   MAX_TENTATIVAS quadros sem conseguir (placa sumiu, sem digito...):
-  //                  volta para o 0 (a apostila manda voltar ao 0)
-  //=========================================================================
-  void comecaLeitura() {
-    for (int d=0; d<10; d++) votos[d] = 0;
-    leituras = 0;
-    tentativas = 0;
-  }
-
-  void estado2_le(const DIGITO& digito) {
-    tentativas++;
-    if (digito.leu) {                      //o DIGITO leu neste quadro?
-      votos[digito.digito]++;
-      leituras++;
-    }
-    info = "lendo " + to_string(leituras) + "/" + to_string(VOTOS);
-
-    if (leituras >= VOTOS) {
-      digitoLido = maisVotado();
-      string lido = "li o digito " + to_string(digitoLido);
-      if (digitoLido == 0 || digitoLido == 1) {
-        ultimaPlaca = timeSinceEpoch();    //a placa esta' a vista agora
-        vaiPara(FIM, lido + ": fim do caminho, parado");
-      } else {
-        movimento = movimentoDoDigito(digitoLido);
-        vaiPara(MOVE, lido + ": " + movimento.nome);   //zera o cronometro
+    if (estado == SEGUE) {
+      //===================================================================
+      // Estado 0 - SEGUE: detecta e segue a placa (o mesmo controle da fase 4).
+      //   sem placa      -> parado, continua no 0
+      //   placa pequena  -> anda na direcao dela
+      //   placa grande   -> vai para o 1 (parar antes de bater)
+      //===================================================================
+      if (!placa.achou) {
+        info = "sem placa";
+        return;                              //rodas paradas
       }
-    } else if (tentativas >= MAX_TENTATIVAS) {
-      vaiPara(SEGUE, "nao consegui ler o digito");
+      if (placa.melhor.lado >= LADO_PERTO) {
+        info = "placa perto";
+        vaiPara(PARA, "placa grande: para para ler");
+        return;                              //rodas paradas
+      }
+      //desvio: -1 com a placa na borda esquerda, 0 no centro, +1 na direita
+      double centro = 320/2.0;
+      double desvio = (placa.melhor.c - centro)/centro;
+      //placa a direita (desvio>0): esquerda acelera, direita freia -> vira a direita
+      esq = max(-1.0, min(VEL + GANHO*desvio, 1.0));
+      dir = max(-1.0, min(VEL - GANHO*desvio, 1.0));
+      info = "dirx=" + to_string(int(round(100*desvio)));   //como na figura 7
+
+    } else if (estado == PARA) {
+      //===================================================================
+      // Estado 1 - PARA: motores desligados ate' o carrinho parar de vez.
+      // Pela inercia, ele ainda anda um pouco; ler o digito agora daria uma
+      // imagem borrada (figura 8).
+      //===================================================================
+      info = "parando";
+      if (timeSinceEpoch() - inicioEstado >= TEMPO_PARADA) {
+        //zera a contagem do estado 2 antes de entrar nele
+        for (int d=0; d<10; d++) votos[d] = 0;
+        leituras = 0;
+        tentativas = 0;
+        vaiPara(LE, "carrinho parado");
+      }
+
+    } else if (estado == LE) {
+      //===================================================================
+      // Estado 2 - LE: le o digito com o carrinho parado (figura 9).
+      // Uma leitura erra de vez em quando (1% no capturado.avi, ver a
+      // licao #1/2 da aula 5); um erro aqui faria o carrinho virar para o
+      // lado errado. Entao juntamos VOTOS leituras e vence o digito mais
+      // lido (maioria).
+      //   VOTOS leituras: 0 ou 1 -> 4 FIM (para);  2..9 -> 3 MOVE
+      //   MAX_TENTATIVAS quadros sem conseguir (placa sumiu, sem digito...):
+      //                  volta para o 0 (a apostila manda voltar ao 0)
+      //===================================================================
+      tentativas++;
+      if (digito.leu) {                      //o DIGITO leu neste quadro?
+        votos[digito.digito]++;
+        leituras++;
+      }
+      info = "lendo " + to_string(leituras) + "/" + to_string(VOTOS);
+
+      if (leituras >= VOTOS) {
+        //o digito com mais votos (no empate, o menor)
+        digitoLido = 0;
+        for (int d=1; d<10; d++)
+          if (votos[d] > votos[digitoLido]) digitoLido = d;
+        string lido = "li o digito " + to_string(digitoLido);
+
+        if (digitoLido == 0 || digitoLido == 1) {
+          ultimaPlaca = timeSinceEpoch();    //a placa esta' a vista agora
+          vaiPara(FIM, lido + ": fim do caminho, parado");
+        } else {
+          //A tabela de comandos da apostila (2025, p. 5):
+          //   2       vire 180 graus a esquerda    3       vire 180 graus a direita
+          //   4 ou 5  passe por baixo da placa e continue em frente
+          //   6 ou 7  vire 90 graus a esquerda     8 ou 9  vire 90 graus a direita
+          //Girar no proprio eixo: uma roda para frente e a outra para tras.
+          //   esquerda: esq = -GIRO, dir = +GIRO   direita: esq = +GIRO, dir = -GIRO
+          int d = digitoLido;
+          if (d==2)              movimento = { -GIRO,  GIRO,     TEMPO_180,   "180 graus a esquerda" };
+          else if (d==3)         movimento = {  GIRO, -GIRO,     TEMPO_180,   "180 graus a direita" };
+          else if (d==4 || d==5) movimento = { VEL_PASSA, VEL_PASSA, TEMPO_PASSA, "passa por baixo" };
+          else if (d==6 || d==7) movimento = { -GIRO,  GIRO,     TEMPO_90,    "90 graus a esquerda" };
+          else                   movimento = {  GIRO, -GIRO,     TEMPO_90,    "90 graus a direita" };   //8 ou 9
+          vaiPara(MOVE, lido + ": " + movimento.nome);   //zera o cronometro
+        }
+      } else if (tentativas >= MAX_TENTATIVAS) {
+        vaiPara(SEGUE, "nao consegui ler o digito");
+      }
+
+    } else if (estado == MOVE) {
+      //===================================================================
+      // Estado 3 - MOVE: faz o movimento do digito durante o seu tempo.
+      // O servidor continua mandando quadros (borrados: figura 10), mas aqui
+      // eles nao mudam nada - o movimento e' so' por tempo.
+      //===================================================================
+      esq = movimento.esq;
+      dir = movimento.dir;
+      double falta = movimento.tempo - (timeSinceEpoch() - inicioEstado);
+      char texto[64];
+      snprintf(texto, sizeof texto, "%s (%.1fs)", movimento.nome.c_str(), max(0.0, falta));   //[C]
+      info = texto;
+      if (falta <= 0) {
+        esq = 0;
+        dir = 0;
+        vaiPara(TERMINA, "fim do movimento");
+      }
+
+    } else if (estado == FIM) {
+      //===================================================================
+      // Estado 4 - FIM: fim do caminho (digito 0 ou 1). O carrinho fica parado
+      // enquanto a placa estiver a vista. Quando ela some por TEMPO_SEM_PLACA
+      // (alguem a tirou, ou o carrinho foi levado para outro lugar), volta ao
+      // estado 0 e procura a proxima placa. (A apostila termina os programas
+      // aqui; ver a "Diferenca da apostila" no topo desta secao.)
+      // Por que esperar a placa SUMIR, e nao so' um tempo? Se voltasse ao 0 com
+      // a placa 0 ainda na frente, leria o 0 de novo e ficaria nesse vai-e-vem.
+      //===================================================================
+      if (placa.achou) ultimaPlaca = timeSinceEpoch();   //ainda vejo a placa
+      double semPlaca = timeSinceEpoch() - ultimaPlaca;
+      info = "fim do caminho: parado (tire a placa para recomecar)";
+      if (semPlaca >= TEMPO_SEM_PLACA)
+        vaiPara(SEGUE, "placa saiu de vista: procura a proxima");
+
+    } else if (estado == TERMINA) {
+      //===================================================================
+      // Estado 5 - TERMINA: motores desligados ate' o giro parar (figura 12),
+      // e volta ao 0 para procurar a proxima placa.
+      //===================================================================
+      info = "terminando movimento";
+      if (timeSinceEpoch() - inicioEstado >= TEMPO_PARADA)
+        vaiPara(SEGUE, "carrinho parado");
     }
-  }
-
-  //o digito com mais votos (no empate, o menor)
-  int maisVotado() const {
-    int melhor = 0;
-    for (int d=1; d<10; d++)
-      if (votos[d] > votos[melhor]) melhor = d;
-    return melhor;
-  }
-
-  //=========================================================================
-  // Estado 3 - MOVE: faz o movimento do digito durante o seu tempo.
-  // O servidor6 continua mandando quadros (borrados: figura 10), mas aqui
-  // eles nao mudam nada - o movimento e' so' por tempo.
-  //=========================================================================
-  void estado3_move() {
-    esq = movimento.esq;
-    dir = movimento.dir;
-    double falta = movimento.tempo - tempoNoEstado();
-    char texto[64];
-    snprintf(texto, sizeof texto, "%s (%.1fs)", movimento.nome.c_str(), max(0.0, falta));   //[C]
-    info = texto;
-    if (falta <= 0) {
-      esq = 0;
-      dir = 0;
-      vaiPara(TERMINA, "fim do movimento");
-    }
-  }
-
-  //=========================================================================
-  // Estado 4 - FIM: fim do caminho (digito 0 ou 1). O carrinho fica parado
-  // enquanto a placa estiver a vista. Quando ela some por TEMPO_SEM_PLACA
-  // (alguem a tirou, ou o carrinho foi levado para outro lugar), volta ao
-  // estado 0 e procura a proxima placa. (A apostila termina os programas
-  // aqui; ver a "Diferenca da apostila" no topo desta secao.)
-  // Por que esperar a placa SUMIR, e nao so' um tempo? Se voltasse ao 0 com
-  // a placa 0 ainda na frente, leria o 0 de novo e ficaria nesse vai-e-vem.
-  //=========================================================================
-  void estado4_fim(const PLACA& placa) {
-    if (placa.achou) ultimaPlaca = timeSinceEpoch();   //ainda vejo a placa
-    double semPlaca = timeSinceEpoch() - ultimaPlaca;
-    info = "fim do caminho: parado (tire a placa para recomecar)";
-    if (semPlaca >= TEMPO_SEM_PLACA)
-      vaiPara(SEGUE, "placa saiu de vista: procura a proxima");
-  }
-
-  //=========================================================================
-  // Estado 5 - TERMINA: motores desligados ate' o giro parar (figura 12),
-  // e volta ao 0 para procurar a proxima placa.
-  //=========================================================================
-  void estado5_termina() {
-    info = "terminando movimento";
-    if (tempoNoEstado() >= TEMPO_PARADA)
-      vaiPara(SEGUE, "carrinho parado");
   }
 };
 
 //#########################################################################
-// TELA E PROGRAMA
+// PROGRAMA
 //#########################################################################
 
-//---------------------------------------------------------------------------
-// achaModelo: acha quadrado.png rodando de aula5/ ou de aula5/tarefa2/
-//---------------------------------------------------------------------------
-string achaModelo() {
-  const char* lugares[2] = { "quadrado.png", "../quadrado.png" };
-  for (int i=0; i<2; i++)
-    if (!imread(lugares[i],1).empty()) return lugares[i];   //[OpenCV] conseguiu ler?
-  erro("Erro: nao achei quadrado.png (coloque-o em parte_2/aula5/)");   //[raspberry.hpp]
-  return "";
-}
-
-//---------------------------------------------------------------------------
-// barra: desenha a velocidade de uma roda como uma barra vertical que sai
-// do meio da altura: para cima = frente, para baixo = re.
-//   c: coluna onde a barra comeca;  v: velocidade -1..+1
-//---------------------------------------------------------------------------
-void barra(Mat_<COR>& a, int c, double v, const Scalar& cor) {
-  int meio = a.rows/2;
-  int altura = int(v*(a.rows/2-10));   //v=1 -> quase ate' o topo
-  //rectangle [OpenCV] com dois cantos opostos; FILLED = preenchido
-  rectangle(a, Point(c,meio), Point(c+8,meio-altura), cor, FILLED);
-}
-
-//---------------------------------------------------------------------------
-// montaTela: a imagem da camera com o debug por cima (figuras 7 a 12):
-//   quadrados da placa, barras das rodas, os paineis do digito a direita
-//   (DIGITO::desenha, como na fase 5) e, no alto, o estado e a info.
-//---------------------------------------------------------------------------
-Mat_<COR> montaTela(const Mat_<COR>& img, const PLACA& placa, const DIGITO& digito,
-                    const MAQUINA& maquina) {
-  Mat_<COR> camera = img.clone();      //copia de verdade: img fica limpa para o modo 'c'
-  placa.desenha(camera);
-  const Scalar verde(0,255,0);         //B,G,R
-  barra(camera, 2, maquina.esq, verde);
-  barra(camera, camera.cols-10, maquina.dir, verde);
-
-  Mat_<COR> tela = digito.desenha(camera, placa);   //alarga: 320 + 120 colunas
-
-  //faixa preta no alto, com o estado e a informacao do estado
-  rectangle(tela, Rect(0,0,320,30), Scalar(0,0,0), FILLED);   //[OpenCV]
-  string linha1 = "Estado " + string(NOME_ESTADO[maquina.estado]);
-  if (maquina.digitoLido >= 0) linha1 += "   digito " + to_string(maquina.digitoLido);
-  putText(tela, linha1, Point(4,12), FONT_HERSHEY_PLAIN, 0.9, Scalar(0,255,255), 1);   //[OpenCV]
-  putText(tela, maquina.info, Point(4,26), FONT_HERSHEY_PLAIN, 0.9, Scalar(255,255,255), 1);
-  return tela;
-}
-
-//---------------------------------------------------------------------------
-// apertouEsc: le TODAS as teclas pendentes e diz se alguma foi ESC.
-// Esvaziar a fila evita que teclas acumuladas cheguem atrasadas. O
-// waitKeyEx tambem e' o que faz o imshow realmente desenhar a janela.
-//---------------------------------------------------------------------------
-bool apertouEsc() {
-  bool esc=false;
-  for (int i=0; i<100; i++) {
-    int k = waitKeyEx(1);              //[OpenCV] espera 1 ms por uma tecla
-    if (k<0) break;                    //fila vazia
-    if ((k & 0xffff)==27) esc=true;    //27 = ESC (o GTK poe modificadores nos bits altos)
-  }
-  return esc;
-}
-
-//---------------------------------------------------------------------------
-// montaComando: os 3 bytes do protocolo (ver servidor6.cpp)
-//   termina -> 's' 0 0
-//   senao   -> 'm' esq dir, com esq e dir em % (-100..100) gravados como int8
-//---------------------------------------------------------------------------
-void montaComando(bool termina, double esq, double dir, BYTE cmd[3]) {
-  if (termina) {
-    cmd[0]='s'; cmd[1]=0; cmd[2]=0;
-  } else {
-    cmd[0]='m';
-    //(int8_t) = byte com sinal; (BYTE) = o mesmo byte visto sem sinal
-    cmd[1]=(BYTE)(int8_t)round(100*esq);   //ex.: -0.5 -> -50 -> byte 0xCE
-    cmd[2]=(BYTE)(int8_t)round(100*dir);
-  }
-}
-
 int main(int argc, char *argv[]) {
-  //---- 1) preparacao ----
+  //=======================================================================
+  // 1) preparacao
+  //=======================================================================
   ARGCLIENTE arg(argc,argv,"cliente6");      //[teclado.hpp] ip [video.avi] [t/c]
-  string arqPlaca = achaModelo();
-  DIGITO digito(arqPlaca, achaMnist());      //le o MNIST e treina o FLANN (~2 s)
+
+  //acha quadrado.png rodando de aula5/ ou de aula5/tarefa2/
+  const char* lugaresPlaca[2] = { "quadrado.png", "../quadrado.png" };
+  string arqPlaca = "";
+  for (int i=0; i<2 && arqPlaca==""; i++)
+    if (!imread(lugaresPlaca[i],1).empty()) arqPlaca = lugaresPlaca[i];   //[OpenCV] conseguiu ler?
+  if (arqPlaca=="") erro("Erro: nao achei quadrado.png (coloque-o em parte_2/aula5/)");   //[raspberry.hpp]
+
+  //acha o diretorio dos arquivos do MNIST, rodando de aula5/ ou de
+  //aula5/tarefa2/ ("." = diretorio atual, ".." = o de cima)
+  const char* lugaresMnist[2] = { ".", ".." };
+  string dirMnist = "";
+  for (int i=0; i<2 && dirMnist==""; i++) {
+    string arq = string(lugaresMnist[i]) + "/train-images.idx3-ubyte";
+    FILE* f = fopen(arq.c_str(), "rb");              //[C] consegue abrir?
+    if (f) { fclose(f); dirMnist = lugaresMnist[i]; }
+  }
+  if (dirMnist=="") erro("Erro: nao achei train-images.idx3-ubyte (descompacte o mnist.zip em parte_2/aula5/)");   //[raspberry.hpp]
+
+  DIGITO digito(arqPlaca, dirMnist);         //le o MNIST e treina o FLANN (~2 s)
   PLACA placa(arqPlaca, true);               //detector paralelo
   printf("cliente6: localizando com %d thread(s)\n", placa.threads());
   //Mostra os tempos com que ESTE executavel foi compilado. Mudou uma
@@ -1058,31 +879,77 @@ int main(int argc, char *argv[]) {
   BYTE cmd[3]={'m',0,0};
   client.sendBytes(3,cmd);           //[projeto.hpp] "estou pronto para receber imagem"
 
-  //---- 2) laco: um quadro por volta = um passo da maquina de estados ----
+  //=======================================================================
+  // 2) laco: um quadro por volta = um passo da maquina de estados
+  //=======================================================================
   Mat_<COR> img;
   Mat_<FLT> imgCinza;
   while (true) {
-    //a) recebe o quadro, localiza a placa e tenta ler o digito.
-    //   O leitor roda em todo quadro (para mostrar na tela); a maquina so'
-    //   usa o resultado no estado 2.
+    //---- a) recebe o quadro, localiza a placa e tenta ler o digito ----
+    //O leitor roda em todo quadro (para mostrar na tela); a maquina so'
+    //usa o resultado no estado 2.
     client.receiveImgComp(img);                //[projeto.hpp] recebe JPEG e descomprime
     if (img.rows!=240 || img.cols!=320) resize(img, img, Size(320,240));   //[OpenCV]
     converte(img, imgCinza);                   //[raspberry.hpp] cor -> cinza 0..1
     placa.procura(imgCinza);
     digito.le(placa, img, imgCinza);
 
-    //b) um passo da maquina de estados: decide as rodas
+    //---- b) um passo da maquina de estados: decide as rodas ----
     maquina.passo(placa, digito);
 
-    //c) mostra e grava
-    Mat_<COR> tela = montaTela(img, placa, digito, maquina);
+    //---- c) monta a tela (figuras 7 a 12), mostra e grava ----
+    //A imagem da camera com o debug por cima: quadrados da placa, barras
+    //das rodas, os paineis do digito a direita (DIGITO::desenha, como na
+    //fase 5) e, no alto, o estado e a info.
+    Mat_<COR> camera = img.clone();      //copia de verdade: img fica limpa para o modo 'c'
+    placa.desenha(camera);
+    const Scalar verde(0,255,0);         //B,G,R
+    //Barra: a velocidade da roda como uma barra vertical que sai do meio da
+    //altura: para cima = frente, para baixo = re (v=1 -> quase ate' o topo).
+    double velocidade[2] = { maquina.esq, maquina.dir };
+    int coluna[2] = { 2, camera.cols-10 };   //onde cada barra comeca
+    for (int r=0; r<2; r++) {
+      int meio = camera.rows/2;
+      int altura = int(velocidade[r]*(camera.rows/2-10));
+      //rectangle [OpenCV] com dois cantos opostos; FILLED = preenchido
+      rectangle(camera, Point(coluna[r],meio), Point(coluna[r]+8,meio-altura), verde, FILLED);
+    }
+
+    Mat_<COR> tela = digito.desenha(camera, placa);   //alarga: 320 + 120 colunas
+
+    //faixa preta no alto, com o estado e a informacao do estado
+    rectangle(tela, Rect(0,0,320,30), Scalar(0,0,0), FILLED);   //[OpenCV]
+    string linha1 = "Estado " + string(NOME_ESTADO[maquina.estado]);
+    if (maquina.digitoLido >= 0) linha1 += "   digito " + to_string(maquina.digitoLido);
+    putText(tela, linha1, Point(4,12), FONT_HERSHEY_PLAIN, 0.9, Scalar(0,255,255), 1);   //[OpenCV]
+    putText(tela, maquina.info, Point(4,26), FONT_HERSHEY_PLAIN, 0.9, Scalar(255,255,255), 1);
+
     imshow("cliente6", tela);                  //[OpenCV]
     if (gravador) gravador->grava(arg.modo=='c' ? img : tela);   //'c': so' a camera
 
-    //d) comando ao servidor6. So' o ESC termina: o 's' tambem termina o
-    //   servidor6. (O estado 4 FIM so' para o carrinho.)
-    bool esc = apertouEsc();
-    montaComando(esc, maquina.esq, maquina.dir, cmd);
+    //---- d) teclado: le TODAS as teclas pendentes e ve se alguma foi ESC ----
+    //Esvaziar a fila evita que teclas acumuladas cheguem atrasadas. O
+    //waitKeyEx tambem e' o que faz o imshow realmente desenhar a janela.
+    bool esc=false;
+    for (int i=0; i<100; i++) {
+      int k = waitKeyEx(1);              //[OpenCV] espera 1 ms por uma tecla
+      if (k<0) break;                    //fila vazia
+      if ((k & 0xffff)==27) esc=true;    //27 = ESC (o GTK poe modificadores nos bits altos)
+    }
+
+    //---- e) comando ao servidor6: os 3 bytes do protocolo (ver servidor6.cpp) ----
+    //So' o ESC termina: o 's' tambem termina o servidor6. (O estado 4 FIM
+    //so' para o carrinho.)
+    //   ESC   -> 's' 0 0
+    //   senao -> 'm' esq dir, com esq e dir em % (-100..100) gravados como int8
+    if (esc) {
+      cmd[0]='s'; cmd[1]=0; cmd[2]=0;
+    } else {
+      cmd[0]='m';
+      //(int8_t) = byte com sinal; (BYTE) = o mesmo byte visto sem sinal
+      cmd[1]=(BYTE)(int8_t)round(100*maquina.esq);   //ex.: -0.5 -> -50 -> byte 0xCE
+      cmd[2]=(BYTE)(int8_t)round(100*maquina.dir);
+    }
     client.sendBytes(3,cmd);                   //[projeto.hpp]
     if (esc) {
       printf("ESC: fim\n");

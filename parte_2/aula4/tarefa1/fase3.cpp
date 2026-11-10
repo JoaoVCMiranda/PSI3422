@@ -31,6 +31,7 @@ struct CANDIDATO {
 //    PLACA placa("quadrado.png", paralelo);   //prepara os modelos (uma vez)
 //    if (placa.procura(quadroCinza)) ...      //a cada quadro
 //    placa.melhor.c, placa.melhor.l, ...      //onde achou
+//    placa.desenha(quadro);                   //marca o resultado no quadro
 //---------------------------------------------------------------------------
 class PLACA {
 public:
@@ -79,73 +80,17 @@ public:
     //OpenMP na versao paralela. Assim quem paraleliza e' so' o nosso laco.
     setNumThreads(1);                                 //[OpenCV]
 
-    Mat_<FLT> placaCinza = lePlaca(arqModelo);
-    preparaModelos(placaCinza);
-
-    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
-    mapaCC.resize(NESC);
-    mapaNCC.resize(NESC);
-  }
-
-  int ladoEscala(int s) const { return lado[s]; }
-
-  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
-  int threads() const {
-#ifdef _OPENMP
-    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
-    else return 1;
-#else
-    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
-#endif
-  }
-
-  //=========================================================================
-  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
-  //=========================================================================
-  bool procura(const Mat_<FLT>& f) {
-    calculaMapas(f);                              //PASSO 1 (pesado)
-
-    Mat_<FLT> ccMaximo;      //ccMaximo(l,c)   = maior CC entre as escalas
-    Mat_<int> escalaMaximo;  //escalaMaximo(l,c) = escala que deu esse maior CC
-    maximoEntreEscalas(f.rows, f.cols, ccMaximo, escalaMaximo);   //PASSO 2
-
-    escolheCandidatos(ccMaximo, escalaMaximo);    //PASSO 3
-    escolheMelhor();                              //PASSO 4
-    return achou;
-  }
-
-  //=========================================================================
-  // desenha: marca o resultado no quadro colorido a, como na figura 4:
-  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
-  //   amarelo = a placa encontrada (so' se achou)
-  //=========================================================================
-  void desenha(Mat_<COR>& a) const {
-    for (int k=0; k<(int)candidatos.size(); k++)
-      desenhaCandidato(a, candidatos[k]);
-    if (achou)
-      desenhaMelhor(a);
-  }
-
-private:
-  //=========================================================================
-  // Preparacao (construtor)
-  //=========================================================================
-
-  //Le quadrado.png e converte para niveis de cinza 0..1.
-  //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
-  //que ao virar cinza fica exatamente 1.0 (branco puro).
-  //("static": esta funcao nao usa nenhum campo da classe)
-  static Mat_<FLT> lePlaca(const string& arqModelo) {
+    //---- Le quadrado.png e converte para niveis de cinza 0..1 ----
+    //A placa tem 401x401: preto, branco e o interior do quadrado amarelo,
+    //que ao virar cinza fica exatamente 1.0 (branco puro).
     Mat_<COR> placaCor = imread(arqModelo, 1);        //[OpenCV] 1 = ler colorida
     if (placaCor.empty()) erro("Erro leitura "+arqModelo);   //[raspberry.hpp]
     Mat_<FLT> placaCinza;
     converte(placaCor, placaCinza);                   //[raspberry.hpp] cor -> cinza 0..1
-    return placaCinza;
-  }
 
-  //Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os dois
-  //modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC elementos.
-  void preparaModelos(const Mat_<FLT>& placaCinza) {
+    //---- Gera os NESC tamanhos, de LADO_MAX a LADO_MIN, e para cada um os
+    //dois modelos (CC e NCC). Ao final: modeloCC, modeloNCC e lado tem NESC
+    //elementos. ----
     //PROGRESSAO GEOMETRICA: cada escala e' a anterior vezes "razao".
     //Por que nao aritmetica? O tamanho aparente da placa e' inversamente
     //proporcional a distancia. Com razao constante, o salto RELATIVO entre
@@ -183,27 +128,44 @@ private:
 
       lado.push_back(n);
     }
+
+    //os mapas sao preenchidos pelo procura(); aqui so' criamos as NESC vagas
+    mapaCC.resize(NESC);
+    mapaNCC.resize(NESC);
+  }
+
+  //Quantos threads o PASSO 1 usa (so' para imprimir na tela).
+  int threads() const {
+#ifdef _OPENMP
+    if (paralelo) return omp_get_max_threads();      //[OpenMP] numero de nucleos
+    else return 1;
+#else
+    return 1;   //compilado sem -omp: o #pragma omp e' ignorado
+#endif
   }
 
   //=========================================================================
-  // PASSO 1 - calculaMapas: os 2*NESC template matchings (parte pesada)
+  // procura: roda os 4 passos no quadro f (cinza, 0..1). Devolve achou.
   //=========================================================================
-  //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
-  //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
-  //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
-  //
-  //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
-  //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
-  //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
-  //#pragma abaixo pede ao OpenMP:
-  //   parallel for      divide as iteracoes do for entre os threads
-  //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
-  //                     (os modelos grandes demoram mais que os pequenos;
-  //                     dividir em blocos fixos deixaria nucleos ociosos)
-  //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
-  //                     fase3p usam EXATAMENTE o mesmo codigo.
-  //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
-  void calculaMapas(const Mat_<FLT>& f) {
+  bool procura(const Mat_<FLT>& f) {
+    //---------------------------------------------------------------------
+    // PASSO 1 - os 2*NESC template matchings (parte pesada)
+    //---------------------------------------------------------------------
+    //Sao 20 tarefas: i = 0..19. A tarefa i trabalha na escala i/2 e:
+    //   i par   -> CC  da escala i/2   (i=0: CC escala 0,  i=2: CC escala 1, ...)
+    //   i impar -> NCC da escala i/2   (i=1: NCC escala 0, i=3: NCC escala 1, ...)
+    //
+    //As 20 tarefas sao INDEPENDENTES: cada uma escreve so' no seu mapa
+    //(mapaCC[s] ou mapaNCC[s]) e so' le o quadro f. Entao podem rodar em
+    //qualquer ordem, ao mesmo tempo, em nucleos diferentes - e' o que o
+    //#pragma abaixo pede ao OpenMP:
+    //   parallel for      divide as iteracoes do for entre os threads
+    //   schedule(dynamic) o thread que termina pega a proxima iteracao livre
+    //                     (os modelos grandes demoram mais que os pequenos;
+    //                     dividir em blocos fixos deixaria nucleos ociosos)
+    //   if(paralelo)      so' paraleliza se paralelo==true. Assim fase3 e
+    //                     fase3p usam EXATAMENTE o mesmo codigo.
+    //Sem -omp na compilacao, o #pragma e' ignorado e o for roda normal.
     #pragma omp parallel for schedule(dynamic) if(paralelo)
     for (int i=0; i<2*NESC; i++) {
       int s = i/2;                  //escala desta tarefa
@@ -218,35 +180,29 @@ private:
       if (ehCC) mapaCC[s]  = matchTemplateSame(f, modeloCC[s],  CV_TM_CCORR,         0.0);
       else      mapaNCC[s] = matchTemplateSame(f, modeloNCC[s], CV_TM_CCOEFF_NORMED, 0.0);
     }
-  }
 
-  //=========================================================================
-  // PASSO 2 - maximoEntreEscalas: um mapa so', com o melhor CC de cada pixel
-  //=========================================================================
-  //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
-  //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
-  //(ccMaximo e escalaMaximo sao referencias: sao as variaveis do procura())
-  void maximoEntreEscalas(int nl, int nc, Mat_<FLT>& ccMaximo, Mat_<int>& escalaMaximo) const {
-    ccMaximo = mapaCC[0].clone();               //copia de verdade do mapa da escala 0
-    escalaMaximo = Mat_<int>(nl, nc, 0);        //matriz nl x nc de int, toda com 0
-
+    //---------------------------------------------------------------------
+    // PASSO 2 - um mapa so', com o melhor CC de cada pixel
+    //---------------------------------------------------------------------
+    //Para cada pixel (l,c): qual escala deu o maior CC, e quanto foi.
+    //Comeca supondo que e' a escala 0 e troca sempre que outra for maior.
+    Mat_<FLT> ccMaximo = mapaCC[0].clone();         //ccMaximo(l,c) = maior CC entre as escalas
+    Mat_<int> escalaMaximo(f.rows, f.cols, 0);      //escalaMaximo(l,c) = escala desse maior CC
     for (int s=1; s<NESC; s++)
-      for (int l=0; l<nl; l++)
-        for (int c=0; c<nc; c++)
+      for (int l=0; l<f.rows; l++)
+        for (int c=0; c<f.cols; c++)
           if (mapaCC[s](l,c) > ccMaximo(l,c)) {
             ccMaximo(l,c) = mapaCC[s](l,c);
             escalaMaximo(l,c) = s;
           }
-  }
 
-  //=========================================================================
-  // PASSO 3 - escolheCandidatos: os NCAND maiores picos de CC
-  //=========================================================================
-  //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
-  //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
-  //maiores valores seriam todos pixels vizinhos do MESMO pico.
-  //ATENCAO: altera ccMaximo (por isso ele e' uma copia, feita no PASSO 2).
-  void escolheCandidatos(Mat_<FLT>& ccMaximo, const Mat_<int>& escalaMaximo) {
+    //---------------------------------------------------------------------
+    // PASSO 3 - os NCAND maiores picos de CC
+    //---------------------------------------------------------------------
+    //Repete NCAND vezes: pega o maior valor do mapa e depois "apaga" (poe -1)
+    //um quadrado de lado 2*DIST_MIN+1 em volta dele. Sem apagar, os 20
+    //maiores valores seriam todos pixels vizinhos do MESMO pico.
+    //(Por isso o ccMaximo e' uma copia, feita no PASSO 2: aqui ele e' alterado.)
     candidatos.clear();                         //esvazia o array do quadro anterior
     for (int k=0; k<NCAND; k++) {
       //minMaxLoc [OpenCV]: varre a imagem e devolve o maior valor (vmax) e
@@ -272,12 +228,10 @@ private:
         for (int c=cIni; c<=cFim; c++)
           ccMaximo(l,c) = -1;
     }
-  }
 
-  //=========================================================================
-  // PASSO 4 - escolheMelhor: o candidato de maior NCC, se passar do limiar
-  //=========================================================================
-  void escolheMelhor() {
+    //---------------------------------------------------------------------
+    // PASSO 4 - o candidato de maior NCC, se passar do limiar
+    //---------------------------------------------------------------------
     achou = false;
     for (int k=0; k<(int)candidatos.size(); k++) {
       bool primeiro = !achou;
@@ -289,41 +243,46 @@ private:
     //Ate' aqui "achou" so' quer dizer "havia pelo menos um candidato".
     //Agora a decisao de verdade: o NCC tem que ser alto o bastante.
     if (achou && melhor.ncc < LIMIAR_NCC) achou = false;
+    return achou;
   }
 
   //=========================================================================
-  // Desenho
+  // desenha: marca o resultado no quadro colorido a, como na figura 4:
+  //   ciano   = cada candidato, com 3 numeros: escala, CC x100, NCC x100
+  //   amarelo = a placa encontrada (so' se achou)
   //=========================================================================
+  void desenha(Mat_<COR>& a) const {
+    //---- Cada candidato: quadrado ciano + 3 numeros empilhados a direita ----
+    const Scalar ciano(255,255,0);         //cor na ordem B,G,R
+    for (int k=0; k<(int)candidatos.size(); k++) {
+      const CANDIDATO& cd = candidatos[k];
+      int metade = cd.lado/2;
+      //Rect(coluna do canto, linha do canto, largura, altura)
+      rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
 
-  //Quadrado ciano + 3 numeros empilhados a direita: escala, CC x100, NCC x100.
-  static void desenhaCandidato(Mat_<COR>& a, const CANDIDATO& cd) {
-    const Scalar ciano(255,255,0);       //cor na ordem B,G,R
-    int metade = cd.lado/2;
-    //Rect(coluna do canto, linha do canto, largura, altura)
-    rectangle(a, Rect(cd.c-metade, cd.l-metade, cd.lado, cd.lado), ciano, 1);   //[OpenCV]
-
-    int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
-    int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
-    int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
-    for (int k=0; k<3; k++) {
-      //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
-      putText(a, to_string(numeros[k]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
-      y += 8;                            //proxima linha
+      int x = cd.c+metade+2;               //coluna: logo a direita do quadrado
+      int y = cd.l-metade+8;               //linha: alinhado com o topo do quadrado
+      int numeros[3] = { cd.s, int(round(cd.cc*100)), int(round(cd.ncc*100)) };
+      for (int j=0; j<3; j++) {
+        //putText [OpenCV]: escreve o texto com o canto inferior esquerdo em (x,y)
+        putText(a, to_string(numeros[j]), Point(x,y), FONT_HERSHEY_PLAIN, 0.6, ciano, 1);
+        y += 8;                            //proxima linha
+      }
     }
-  }
 
-  //Quadrado amarelo (mais grosso) + "escala CC NCC" acima dele.
-  void desenhaMelhor(Mat_<COR>& a) const {
-    const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
-    int metade = melhor.lado/2;
-    rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
+    //---- A placa encontrada: quadrado amarelo (mais grosso) + "escala CC NCC" ----
+    if (achou) {
+      const Scalar amarelo(0,255,255);     //cor na ordem B,G,R
+      int metade = melhor.lado/2;
+      rectangle(a, Rect(melhor.c-metade, melhor.l-metade, melhor.lado, melhor.lado), amarelo, 2);  //[OpenCV]
 
-    //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
-    string texto = to_string(melhor.s) + " " +
-                   to_string(int(round(melhor.cc*100))) + " " +
-                   to_string(int(round(melhor.ncc*100)));
-    putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
-            FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+      //monta o texto "escala CC NCC", ex.: "5 20 70" ("+" junta strings)
+      string texto = to_string(melhor.s) + " " +
+                     to_string(int(round(melhor.cc*100))) + " " +
+                     to_string(int(round(melhor.ncc*100)));
+      putText(a, texto, Point(melhor.c-metade, melhor.l-metade-3),
+              FONT_HERSHEY_PLAIN, 0.8, amarelo, 1);                                   //[OpenCV]
+    }
   }
 };
 
